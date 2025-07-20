@@ -20,10 +20,22 @@
         max-width: 10%;
         max-height: 10%;
         object-fit: contain;
+        cursor: pointer;
       }
     </style>
   </head>
   <body>
-    <img src="Logo1.png" alt="goosepipe logo" class="logo" />
+    <img src="Logo1.png" alt="goosepipe logo" class="logo" id="goose-logo" />
+    <audio id="goose-sound" preload="auto">
+      <source src="sound.mp3" type="audio/mpeg">
+    </audio>
+    
+    <script>
+      document.getElementById('goose-logo').addEventListener('click', function() {
+        const audio = document.getElementById('goose-sound');
+        audio.currentTime = 0;
+        audio.play();
+      });
+    </script>
   </body>
 </html>
