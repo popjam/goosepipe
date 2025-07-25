@@ -31,10 +31,30 @@
     </audio>
     
     <script>
-      document.getElementById('goose-logo').addEventListener('click', function() {
-        const audio = document.getElementById('goose-sound');
-        audio.currentTime = 0;
-        audio.play();
+      const gooseLogo = document.getElementById('goose-logo');
+      const gooseSound = document.getElementById('goose-sound');
+      
+      let clickCount = 0;
+      let lastClickTime = 0;
+      
+      gooseLogo.addEventListener('click', function() {
+        const now = new Date().getTime();
+        
+        if (now - lastClickTime < 500) {
+          clickCount++;
+        } else {
+          clickCount = 1;
+        }
+        
+        lastClickTime = now;
+        
+        if (clickCount === 10) {
+          window.open('https://www.youtube.com/watch?v=u08E7c-FRbU', '_blank');
+          clickCount = 0;
+        }
+        
+        gooseSound.currentTime = 0;
+        gooseSound.play();
       });
     </script>
   </body>
