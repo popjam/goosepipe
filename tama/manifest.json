@@ -1,0 +1,158 @@
+[
+  {
+    "slug": "",
+    "title": "Home",
+    "group": "Encyclopedia",
+    "intro": "A player\u2019s guide to the current Tama game."
+  },
+  {
+    "slug": "care",
+    "title": "Attention & good care",
+    "group": "Daily care",
+    "intro": "The Care page tells you what your Tama needs. Clear the need to clear its alert."
+  },
+  {
+    "slug": "controls",
+    "title": "Buttons & first steps",
+    "group": "Start here",
+    "intro": "Four buttons are all you need to care for your Tama."
+  },
+  {
+    "slug": "evolution",
+    "title": "Growing up",
+    "group": "Discover",
+    "intro": "One egg, a lifetime of care, and two possible adult outcomes."
+  },
+  {
+    "slug": "food",
+    "title": "Meals & snacks",
+    "group": "Daily care",
+    "intro": "Meals fill the hunger bar. Snacks lift happiness. Both add a little weight."
+  },
+  {
+    "slug": "mail-library",
+    "title": "Mail & Library",
+    "group": "Around town",
+    "intro": "The shelves and inbox are in place. Their contents are still to come."
+  },
+  {
+    "slug": "medicine",
+    "title": "Sickness & medicine",
+    "group": "Daily care",
+    "intro": "Fix the care problem first, then help your Tama recover."
+  },
+  {
+    "slug": "menus",
+    "title": "The menu map",
+    "group": "Start here",
+    "intro": "Ten icons surround the screen. The triangle on the right points to the selected list entry."
+  },
+  {
+    "slug": "sleep",
+    "title": "Sleep & Lights Out",
+    "group": "Daily care",
+    "intro": "Rest restores energy. Lights Out lets you put your Tama to bed or wake it up."
+  },
+  {
+    "slug": "stats",
+    "title": "Stats & mood",
+    "group": "Daily care",
+    "intro": "Read the bar, watch the face, and check in before a small need becomes a care mistake."
+  },
+  {
+    "slug": "world",
+    "title": "Littlebug Town",
+    "group": "Around town",
+    "intro": "A little town with room to grow. These destinations are visible, but none can be entered yet."
+  },
+  {
+    "slug": "characters/1",
+    "title": "Tama",
+    "group": "Characters",
+    "intro": "The legacy character retained for older saves."
+  },
+  {
+    "slug": "characters/2",
+    "title": "Egg",
+    "group": "Characters",
+    "intro": "A egg form in the current Tama family."
+  },
+  {
+    "slug": "characters/3",
+    "title": "Babytchi",
+    "group": "Characters",
+    "intro": "A baby form in the current Tama family."
+  },
+  {
+    "slug": "characters/4",
+    "title": "Marutchi",
+    "group": "Characters",
+    "intro": "A child form in the current Tama family."
+  },
+  {
+    "slug": "characters/5",
+    "title": "Tamatchi",
+    "group": "Characters",
+    "intro": "A teen form in the current Tama family."
+  },
+  {
+    "slug": "characters/6",
+    "title": "Mametchi",
+    "group": "Characters",
+    "intro": "A adult form in the current Tama family."
+  },
+  {
+    "slug": "characters/7",
+    "title": "Maskutchi",
+    "group": "Characters",
+    "intro": "A adult form in the current Tama family."
+  },
+  {
+    "slug": "characters/8",
+    "title": "Bill",
+    "group": "Characters",
+    "intro": "A elder form in the current Tama family."
+  },
+  {
+    "slug": "characters",
+    "title": "Meet the characters",
+    "group": "Discover",
+    "intro": "8 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
+  },
+  {
+    "slug": "games/17",
+    "title": "Jumping Rope",
+    "group": "Games",
+    "intro": "Time your jumps so the rope passes beneath your character. The pace changes as your score increases."
+  },
+  {
+    "slug": "games/18",
+    "title": "Mimic",
+    "group": "Games",
+    "intro": "This game is listed in the menu but is not implemented yet."
+  },
+  {
+    "slug": "games/19",
+    "title": "Shape",
+    "group": "Games",
+    "intro": "This game is listed in the menu but is not implemented yet."
+  },
+  {
+    "slug": "games/20",
+    "title": "Dance",
+    "group": "Games",
+    "intro": "This game is listed in the menu but is not implemented yet."
+  },
+  {
+    "slug": "games/21",
+    "title": "Flag",
+    "group": "Games",
+    "intro": "Match the large flag cues by colour. Raise both flags for a double cue, and ignore small fake cues. Reversed positions do not change the colour controls."
+  },
+  {
+    "slug": "games",
+    "title": "The games room",
+    "group": "Discover",
+    "intro": "Learn the controls, see the screens, and find your next challenge."
+  }
+]
