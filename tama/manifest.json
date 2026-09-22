@@ -132,10 +132,16 @@
     "intro": "A adult form in the current Tama family."
   },
   {
+    "slug": "characters/12",
+    "title": "Teletubby",
+    "group": "Characters",
+    "intro": "A adult form in the current Tama family."
+  },
+  {
     "slug": "characters",
     "title": "Meet the characters",
     "group": "Discover",
-    "intro": "11 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
+    "intro": "12 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
   },
   {
     "slug": "games/17",
