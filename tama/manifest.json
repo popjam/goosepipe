@@ -114,10 +114,16 @@
     "intro": "A elder form in the current Tama family."
   },
   {
+    "slug": "characters/9",
+    "title": "Teapot",
+    "group": "Characters",
+    "intro": "A adult form in the current Tama family."
+  },
+  {
     "slug": "characters",
     "title": "Meet the characters",
     "group": "Discover",
-    "intro": "8 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
+    "intro": "9 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
   },
   {
     "slug": "games/17",
