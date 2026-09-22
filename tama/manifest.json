@@ -138,10 +138,16 @@
     "intro": "A adult form in the current Tama family."
   },
   {
+    "slug": "characters/13",
+    "title": "Shark",
+    "group": "Characters",
+    "intro": "A adult form in the current Tama family."
+  },
+  {
     "slug": "characters",
     "title": "Meet the characters",
     "group": "Discover",
-    "intro": "12 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
+    "intro": "13 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
   },
   {
     "slug": "games/17",
