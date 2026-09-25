@@ -69,7 +69,7 @@
     "slug": "characters/1",
     "title": "Tama",
     "group": "Characters",
-    "intro": "The legacy character retained for older saves."
+    "intro": "The original Tama, kept for long-time owners."
   },
   {
     "slug": "characters/2",
@@ -159,19 +159,19 @@
     "slug": "games/18",
     "title": "Mimic",
     "group": "Games",
-    "intro": "This game is listed in the menu but is not implemented yet."
+    "intro": "This game is not available yet."
   },
   {
     "slug": "games/19",
     "title": "Shape",
     "group": "Games",
-    "intro": "This game is listed in the menu but is not implemented yet."
+    "intro": "This game is not available yet."
   },
   {
     "slug": "games/20",
     "title": "Dance",
     "group": "Games",
-    "intro": "This game is listed in the menu but is not implemented yet."
+    "intro": "This game is not available yet."
   },
   {
     "slug": "games/21",
