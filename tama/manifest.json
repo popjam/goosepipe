@@ -55,9 +55,9 @@
   },
   {
     "slug": "stats",
-    "title": "Stats & mood",
+    "title": "Stats & hearts",
     "group": "Daily care",
-    "intro": "Read the bar, watch the face, and check in before a small need becomes a care mistake."
+    "intro": "Count the hearts and check in before a small need becomes a care mistake."
   },
   {
     "slug": "world",
@@ -165,7 +165,7 @@
     "slug": "games/19",
     "title": "Shape",
     "group": "Games",
-    "intro": "This game is not available yet."
+    "intro": "Shapes fall down two lanes. Change your shape with B until it matches, then throw it up the left or right lane to knock the falling shape out."
   },
   {
     "slug": "games/20",
@@ -178,6 +178,12 @@
     "title": "Flag",
     "group": "Games",
     "intro": "Match the large flag cues by colour. Raise both flags for a double cue, and ignore small fake cues. Reversed positions do not change the colour controls."
+  },
+  {
+    "slug": "games/49",
+    "title": "Climb",
+    "group": "Games",
+    "intro": "Your Tamagotchi stands on a cloud while another drifts back and forth above it. Jump at the right moment to land on it and climb higher."
   },
   {
     "slug": "games",
