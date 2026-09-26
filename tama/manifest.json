@@ -30,12 +30,6 @@
     "intro": "Meals fill the hunger bar. Snacks lift happiness. Both add a little weight."
   },
   {
-    "slug": "items",
-    "title": "Food & items",
-    "group": "Daily care",
-    "intro": "Everything your Tama can eat or own, and where to find it."
-  },
-  {
     "slug": "mail-library",
     "title": "Mail & Library",
     "group": "Around town",
