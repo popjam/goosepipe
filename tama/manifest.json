@@ -31,9 +31,9 @@
   },
   {
     "slug": "items",
-    "title": "Food & items",
+    "title": "Items",
     "group": "Daily care",
-    "intro": "Everything your Tama can eat or own, and where to find it."
+    "intro": "Things your Tama owns, and how to look through them. Food lives on the Meals & snacks page."
   },
   {
     "slug": "mail-library",
