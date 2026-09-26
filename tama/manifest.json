@@ -30,10 +30,28 @@
     "intro": "Meals fill the hunger bar. Snacks lift happiness. Both add a little weight."
   },
   {
-    "slug": "mail-library",
-    "title": "Mail & Library",
+    "slug": "items",
+    "title": "Items",
+    "group": "Daily care",
+    "intro": "Things your Tama owns, and how to look through them. Food lives on the Meals & snacks page."
+  },
+  {
+    "slug": "library",
+    "title": "Library",
     "group": "Around town",
-    "intro": "The shelves and inbox are in place. Their contents are still to come."
+    "intro": "The shelves are in place. Their contents are still to come."
+  },
+  {
+    "slug": "littlebug-town",
+    "title": "Littlebug Town",
+    "group": "Around town",
+    "intro": "A little town with room to grow. These destinations are visible, but none can be entered yet."
+  },
+  {
+    "slug": "mail",
+    "title": "Mail",
+    "group": "Around town",
+    "intro": "Your Tama\u2019s letterbox. The inbox is in place; letters are still to come."
   },
   {
     "slug": "medicine",
@@ -61,9 +79,9 @@
   },
   {
     "slug": "world",
-    "title": "Littlebug Town",
+    "title": "World",
     "group": "Around town",
-    "intro": "A little town with room to grow. These destinations are visible, but none can be entered yet."
+    "intro": "Places your Tama will be able to visit. Choose World from the menu to see them. None of them can be entered yet."
   },
   {
     "slug": "characters/1",
