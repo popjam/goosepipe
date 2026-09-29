@@ -18,10 +18,22 @@
     "intro": "Four buttons are all you need to care for your Tama."
   },
   {
+    "slug": "corner-shop",
+    "title": "Corner Shop",
+    "group": "Around town",
+    "intro": "Littlebug Town\u2019s little shop. Four things on the shelf, a friendly clerk, and new stock three times a day."
+  },
+  {
     "slug": "evolution",
     "title": "Growing up",
     "group": "Discover",
-    "intro": "One egg, a lifetime of care, and two possible adult outcomes."
+    "intro": "From one egg to an elder, through the forms your care leads to."
+  },
+  {
+    "slug": "fishing",
+    "title": "Fishing",
+    "group": "Around town",
+    "intro": "Cast a line at Littlebug Town\u2019s Pond. Hook a fish, reel it in and keep it. Now and then you might pull up a boot."
   },
   {
     "slug": "food",
@@ -45,7 +57,7 @@
     "slug": "littlebug-town",
     "title": "Littlebug Town",
     "group": "Around town",
-    "intro": "A little town with room to grow. These destinations are visible, but none can be entered yet."
+    "intro": "A little town with room to grow. The Pond is open for fishing; the other destinations can\u2019t be entered yet."
   },
   {
     "slug": "mail",
@@ -66,6 +78,18 @@
     "intro": "Ten icons surround the screen. The triangle on the right points to the selected list entry."
   },
   {
+    "slug": "points",
+    "title": "Points",
+    "group": "Discover",
+    "intro": "Win points by playing games, then spend them at the Corner Shop."
+  },
+  {
+    "slug": "settings",
+    "title": "Settings",
+    "group": "Start here",
+    "intro": "Press A and D together to open Settings from the home screen or any menu."
+  },
+  {
     "slug": "sleep",
     "title": "Sleep & Lights Out",
     "group": "Daily care",
@@ -81,85 +105,85 @@
     "slug": "world",
     "title": "World",
     "group": "Around town",
-    "intro": "Places your Tama will be able to visit. Choose World from the menu to see them. None of them can be entered yet."
+    "intro": "Places your Tama can visit. Choose World from the menu to see them. The Corner Shop and the Pond are open; the other places are still to come."
   },
   {
     "slug": "characters/1",
-    "title": "Tama",
+    "title": "Kutchipatchi",
     "group": "Characters",
-    "intro": "The original Tama, kept for long-time owners."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters/2",
     "title": "Egg",
     "group": "Characters",
-    "intro": "A egg form in the current Tama family."
+    "intro": "A egg form in the Tama family."
   },
   {
     "slug": "characters/3",
     "title": "Babytchi",
     "group": "Characters",
-    "intro": "A baby form in the current Tama family."
+    "intro": "A baby form in the Tama family."
   },
   {
     "slug": "characters/4",
     "title": "Marutchi",
     "group": "Characters",
-    "intro": "A child form in the current Tama family."
+    "intro": "A child form in the Tama family."
   },
   {
     "slug": "characters/5",
     "title": "Tamatchi",
     "group": "Characters",
-    "intro": "A teen form in the current Tama family."
+    "intro": "A teen form in the Tama family."
   },
   {
     "slug": "characters/6",
     "title": "Mametchi",
     "group": "Characters",
-    "intro": "A adult form in the current Tama family."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters/7",
     "title": "Maskutchi",
     "group": "Characters",
-    "intro": "A adult form in the current Tama family."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters/8",
     "title": "Bill",
     "group": "Characters",
-    "intro": "A elder form in the current Tama family."
+    "intro": "A elder form in the Tama family."
   },
   {
     "slug": "characters/9",
     "title": "Teapot",
     "group": "Characters",
-    "intro": "A adult form in the current Tama family."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters/10",
     "title": "Fork",
     "group": "Characters",
-    "intro": "A adult form in the current Tama family."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters/11",
     "title": "Makkapakka",
     "group": "Characters",
-    "intro": "A adult form in the current Tama family."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters/12",
     "title": "Teletubby",
     "group": "Characters",
-    "intro": "A adult form in the current Tama family."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters/13",
     "title": "Shark",
     "group": "Characters",
-    "intro": "A adult form in the current Tama family."
+    "intro": "A adult form in the Tama family."
   },
   {
     "slug": "characters",
@@ -174,10 +198,10 @@
     "intro": "Time your jumps so the rope passes beneath your character. The pace changes as your score increases."
   },
   {
-    "slug": "games/18",
-    "title": "Mimic",
+    "slug": "games/49",
+    "title": "Climb",
     "group": "Games",
-    "intro": "This game is not available yet."
+    "intro": "Your Tamagotchi stands on a cloud while another drifts back and forth above it. Jump at the right moment to land on it and climb higher."
   },
   {
     "slug": "games/19",
@@ -186,22 +210,16 @@
     "intro": "Shapes fall down two lanes. Change your shape with B until it matches, then throw it up the left or right lane to knock the falling shape out."
   },
   {
-    "slug": "games/20",
-    "title": "Dance",
-    "group": "Games",
-    "intro": "This game is not available yet."
-  },
-  {
     "slug": "games/21",
     "title": "Flag",
     "group": "Games",
     "intro": "Match the large flag cues by colour. Raise both flags for a double cue, and ignore small fake cues. Reversed positions do not change the colour controls."
   },
   {
-    "slug": "games/49",
-    "title": "Climb",
+    "slug": "games/56",
+    "title": "Manhole",
     "group": "Games",
-    "intro": "Your Tamagotchi stands on a cloud while another drifts back and forth above it. Jump at the right moment to land on it and climb higher."
+    "intro": "Hearts, money bags and snakes fall towards four manholes, one for each button. Open a hole just as a treat arrives to catch it, but keep it shut when a snake is coming."
   },
   {
     "slug": "games",
