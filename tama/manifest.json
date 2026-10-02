@@ -243,13 +243,25 @@
     "slug": "games/60",
     "title": "Snap",
     "group": "Games",
-    "intro": "Take turns with another Tamagotchi laying cards on one pile. When the top two cards match, be first to call SNAP and the pile is yours."
+    "intro": "Cards turn over one by one onto a pile at the table. When the top two match, slap the pile before the other Tamagotchi does and it's yours."
   },
   {
     "slug": "games/61",
     "title": "Cup Game",
     "group": "Games",
-    "intro": "Watch the ball go under a cup, follow the cups as they are shuffled on the table, then lift the right one. Five rounds, each faster than the last."
+    "intro": "Watch the ball go under a cup, follow the cups as they are shuffled on the table, then lift the right one. Six rounds, each harder than the last."
+  },
+  {
+    "slug": "games/62",
+    "title": "Crazy 8S",
+    "group": "Games",
+    "intro": "Take turns with another Tamagotchi laying cards that match the pile by number or suit. Eights are wild. Be first to empty your hand."
+  },
+  {
+    "slug": "games/63",
+    "title": "Dots & Boxes",
+    "group": "Games",
+    "intro": "Take turns with another Tamagotchi drawing lines between dots. Close a box to keep it and draw again; more boxes wins."
   },
   {
     "slug": "games",
