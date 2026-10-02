@@ -222,6 +222,36 @@
     "intro": "Hearts, money bags and snakes fall towards four manholes, one for each button. Open a hole just as a treat arrives to catch it, but keep it shut when a snake is coming."
   },
   {
+    "slug": "games/57",
+    "title": "Memory",
+    "group": "Games",
+    "intro": "Watch the pattern of arrows that appears above your Tamagotchi, then repeat it with the buttons. Each round the pattern is one arrow longer."
+  },
+  {
+    "slug": "games/58",
+    "title": "Blackjack",
+    "group": "Games",
+    "intro": "Play blackjack for your points against Bill the dealer, with other Tamagotchi at the table. Get closer to 21 than the dealer without going over."
+  },
+  {
+    "slug": "games/59",
+    "title": "Match",
+    "group": "Games",
+    "intro": "Take turns with another Tamagotchi flipping cards two at a time to find pairs. Find a pair and you go again."
+  },
+  {
+    "slug": "games/60",
+    "title": "Snap",
+    "group": "Games",
+    "intro": "Take turns with another Tamagotchi laying cards on one pile. When the top two cards match, be first to call SNAP and the pile is yours."
+  },
+  {
+    "slug": "games/61",
+    "title": "Cup Game",
+    "group": "Games",
+    "intro": "Watch the ball go under a cup, follow the cups as they are shuffled on the table, then lift the right one. Five rounds, each faster than the last."
+  },
+  {
     "slug": "games",
     "title": "The games room",
     "group": "Discover",
