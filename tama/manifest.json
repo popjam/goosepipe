@@ -264,6 +264,54 @@
     "intro": "Take turns with another Tamagotchi drawing lines between dots. Close a box to keep it and draw again; more boxes wins."
   },
   {
+    "slug": "games/64",
+    "title": "Mastermind",
+    "group": "Games",
+    "intro": "Crack a hidden code of four marbles in eight guesses. Little key pegs tell you how close each guess was."
+  },
+  {
+    "slug": "games/65",
+    "title": "Gin Rummy",
+    "group": "Games",
+    "intro": "One hand of Gin Rummy against another Tamagotchi. Take a card, throw one away, and meld your hand into runs and sets; knock when your deadwood is low."
+  },
+  {
+    "slug": "games/66",
+    "title": "Connect 4",
+    "group": "Games",
+    "intro": "Take turns with another Tamagotchi dropping discs into an upright board. Four of yours in a row wins."
+  },
+  {
+    "slug": "games/68",
+    "title": "Pig",
+    "group": "Games",
+    "intro": "Push your luck with a die against another Tamagotchi. Every roll adds to your turn's total, but the skull loses it all. Bank in time and be first to 50."
+  },
+  {
+    "slug": "games/69",
+    "title": "War",
+    "group": "Games",
+    "intro": "Four Tamagotchis share a map. Place your armies, then attack your neighbours with a die for every army. Take every region to win."
+  },
+  {
+    "slug": "games/70",
+    "title": "Word Shake",
+    "group": "Games",
+    "intro": "Shake 16 letter dice, then find as many words as you can before the clock runs out. Words your opponent also found don't count."
+  },
+  {
+    "slug": "games/71",
+    "title": "Spit",
+    "group": "Games",
+    "intro": "A race with one deck: play a card one up or one down onto either pile before the other player does. First to get rid of every card wins."
+  },
+  {
+    "slug": "games/72",
+    "title": "Rock Star",
+    "group": "Games",
+    "intro": "Notes roll down a four-lane highway: press A, B, C or D as each one reaches its target. Keep the streak going and the crowd happy."
+  },
+  {
     "slug": "games",
     "title": "The games room",
     "group": "Discover",
