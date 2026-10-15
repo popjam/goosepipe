@@ -201,7 +201,7 @@
     "slug": "games/49",
     "title": "Climb",
     "group": "Games",
-    "intro": "Your Tamagotchi stands on a cloud while another drifts back and forth above it. Jump at the right moment to land on it and climb higher."
+    "intro": "Your Tamagotchi stands on a cloud while another drifts back and forth above it. Jump at the right moment to land on it and climb: up through the night into space, down into an alien planet's air, and up to a sky serpent at the top."
   },
   {
     "slug": "games/19",
@@ -231,7 +231,7 @@
     "slug": "games/58",
     "title": "Blackjack",
     "group": "Games",
-    "intro": "Play blackjack for your points against Bill the dealer, with other Tamagotchi at the table. Get closer to 21 than the dealer without going over."
+    "intro": "Play blackjack for your points against Bill the dealer. Get closer to 21 than the dealer without going over."
   },
   {
     "slug": "games/59",
@@ -249,13 +249,13 @@
     "slug": "games/61",
     "title": "Cup Game",
     "group": "Games",
-    "intro": "Watch the ball go under a cup, follow the cups as they are shuffled on the table, then lift the right one. Six rounds, each harder than the last."
+    "intro": "Watch the ball go under a cup, follow the cups as they are shuffled on the table, then lift the right one. Ten rounds, each harder than the last; from the seventh, more cups."
   },
   {
     "slug": "games/62",
     "title": "Crazy 8S",
     "group": "Games",
-    "intro": "Take turns with another Tamagotchi laying cards that match the pile by number or suit. Eights are wild. Be first to empty your hand."
+    "intro": "Take turns with another Tamagotchi laying cards that match the pile by number or suit. Eights are wild, and black power cards go on anything: draw two, skip, swap hands and more. Be first to empty your hand."
   },
   {
     "slug": "games/63",
@@ -310,6 +310,18 @@
     "title": "Rock Star",
     "group": "Games",
     "intro": "Notes roll down a four-lane highway: press A, B, C or D as each one reaches its target. Keep the streak going and the crowd happy."
+  },
+  {
+    "slug": "games/73",
+    "title": "Scrabble",
+    "group": "Games",
+    "intro": "A short game of Scrabble against another Tamagotchi: take turns making words on the board from your 7 tiles. The higher total wins."
+  },
+  {
+    "slug": "games/74",
+    "title": "Dominion",
+    "group": "Games",
+    "intro": "Build a deck against another Tamagotchi: play actions, buy treasure and better cards, and end with the most victory points. 10 of the 26 base-set kingdom cards each game."
   },
   {
     "slug": "games",
