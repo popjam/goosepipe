@@ -324,6 +324,12 @@
     "intro": "Build a deck against another Tamagotchi: play actions, buy treasure and better cards, and end with the most victory points. 10 of the 26 base-set kingdom cards each game."
   },
   {
+    "slug": "games/75",
+    "title": "Word Guess",
+    "group": "Games",
+    "intro": "Find the hidden five-letter word in six guesses. After each guess, every letter shows whether it is in the right place, somewhere else in the word, or not in it at all."
+  },
+  {
     "slug": "games",
     "title": "The games room",
     "group": "Discover",
