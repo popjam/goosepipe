@@ -330,6 +330,12 @@
     "intro": "Find the hidden five-letter word in six guesses. After each guess, every letter shows whether it is in the right place, somewhere else in the word, or not in it at all."
   },
   {
+    "slug": "games/76",
+    "title": "Hurdles",
+    "group": "Games",
+    "intro": "Race another Tamagotchi over ten shared hurdles. Jump to clear them and slam down for a speed boost."
+  },
+  {
     "slug": "games",
     "title": "The games room",
     "group": "Discover",
