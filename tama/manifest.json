@@ -3,37 +3,37 @@
     "slug": "",
     "title": "Home",
     "group": "Encyclopedia",
-    "intro": "A player\u2019s guide to the current Tama game."
+    "intro": "A player\u2019s guide to Tama."
   },
   {
     "slug": "care",
     "title": "Attention & good care",
     "group": "Daily care",
-    "intro": "The Care page tells you what your Tama needs. Clear the need to clear its alert."
+    "intro": "Care shows what your Tama needs. Meeting the need clears its alert."
   },
   {
     "slug": "controls",
     "title": "Buttons & first steps",
     "group": "Start here",
-    "intro": "Four buttons are all you need to care for your Tama."
+    "intro": "The Tama has four buttons: A, B, C and D."
   },
   {
     "slug": "corner-shop",
     "title": "Corner Shop",
     "group": "Around town",
-    "intro": "Littlebug Town\u2019s little shop. Four things on the shelf, a friendly clerk, and new stock three times a day."
+    "intro": "The shop in Littlebug Town. It sells four items at a time and restocks three times a day."
   },
   {
     "slug": "evolution",
     "title": "Growing up",
     "group": "Discover",
-    "intro": "From one egg to an elder, through the forms your care leads to."
+    "intro": "Your Tama grows from an egg to an elder. Its care decides which forms it takes."
   },
   {
     "slug": "fishing",
     "title": "Fishing",
     "group": "Around town",
-    "intro": "Cast a line at Littlebug Town\u2019s Pond. Hook a fish, reel it in and keep it. Now and then you might pull up a boot."
+    "intro": "Fish at the Pond in Littlebug Town. Catches go into Items. Sometimes you pull up a boot."
   },
   {
     "slug": "food",
@@ -45,31 +45,31 @@
     "slug": "items",
     "title": "Items",
     "group": "Daily care",
-    "intro": "Things your Tama owns, and how to look through them. Food lives on the Meals & snacks page."
+    "intro": "Things your Tama owns. Food is on the Meals & snacks page."
   },
   {
     "slug": "library",
     "title": "Library",
     "group": "Around town",
-    "intro": "The shelves are in place. Their contents are still to come."
+    "intro": "The Library has three entries. None are available yet."
   },
   {
     "slug": "littlebug-town",
     "title": "Littlebug Town",
     "group": "Around town",
-    "intro": "A little town with room to grow. The Pond is open for fishing; the other destinations can\u2019t be entered yet."
+    "intro": "The first town. The Corner Shop and the Pond are open; the Doctor and the Bus Station are not."
   },
   {
     "slug": "mail",
     "title": "Mail",
     "group": "Around town",
-    "intro": "Your Tama\u2019s letterbox. The inbox is in place; letters are still to come."
+    "intro": "Your Tama\u2019s letterbox. Letters are not available yet."
   },
   {
     "slug": "medicine",
     "title": "Sickness & medicine",
     "group": "Daily care",
-    "intro": "Fix the care problem first, then help your Tama recover."
+    "intro": "Hunger and dirt make your Tama sick. Remove the cause, then give Medicine."
   },
   {
     "slug": "menus",
@@ -87,109 +87,109 @@
     "slug": "settings",
     "title": "Settings",
     "group": "Start here",
-    "intro": "Press A and D together to open Settings from the home screen or any menu."
+    "intro": "Settings belong to you, not your Tama, and carry over to every new generation."
   },
   {
     "slug": "sleep",
     "title": "Sleep & Lights Out",
     "group": "Daily care",
-    "intro": "Rest restores energy. Lights Out lets you put your Tama to bed or wake it up."
+    "intro": "Sleep restores energy. Lights Out puts your Tama to bed or wakes it up."
   },
   {
     "slug": "stats",
     "title": "Stats & hearts",
     "group": "Daily care",
-    "intro": "Count the hearts and check in before a small need becomes a care mistake."
+    "intro": "The Stats pages show your Tama\u2019s needs, skills and identity."
   },
   {
     "slug": "world",
     "title": "World",
     "group": "Around town",
-    "intro": "Places your Tama can visit. Choose World from the menu to see them. The Corner Shop and the Pond are open; the other places are still to come."
+    "intro": "Places your Tama can visit from the World menu. The Corner Shop and the Pond are open."
   },
   {
     "slug": "characters/1",
     "title": "Kutchipatchi",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters/2",
     "title": "Egg",
     "group": "Characters",
-    "intro": "A egg form in the Tama family."
+    "intro": "A egg form."
   },
   {
     "slug": "characters/3",
     "title": "Babytchi",
     "group": "Characters",
-    "intro": "A baby form in the Tama family."
+    "intro": "A baby form."
   },
   {
     "slug": "characters/4",
     "title": "Marutchi",
     "group": "Characters",
-    "intro": "A child form in the Tama family."
+    "intro": "A child form."
   },
   {
     "slug": "characters/5",
     "title": "Tamatchi",
     "group": "Characters",
-    "intro": "A teen form in the Tama family."
+    "intro": "A teen form."
   },
   {
     "slug": "characters/6",
     "title": "Mametchi",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters/7",
     "title": "Maskutchi",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters/8",
     "title": "Bill",
     "group": "Characters",
-    "intro": "A elder form in the Tama family."
+    "intro": "A elder form."
   },
   {
     "slug": "characters/9",
     "title": "Teapot",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters/10",
     "title": "Fork",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters/11",
     "title": "Makkapakka",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters/12",
     "title": "Teletubby",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters/13",
     "title": "Shark",
     "group": "Characters",
-    "intro": "A adult form in the Tama family."
+    "intro": "A adult form."
   },
   {
     "slug": "characters",
     "title": "Meet the characters",
     "group": "Discover",
-    "intro": "13 characters, from a tiny egg to an elder. Explore each form\u2019s traits and animations."
+    "intro": "13 characters, from egg to elder, with each form\u2019s traits and animations."
   },
   {
     "slug": "games/17",
@@ -309,7 +309,7 @@
     "slug": "games/72",
     "title": "Rock Star",
     "group": "Games",
-    "intro": "Notes roll down a four-lane highway: press A, B, C or D as each one reaches its target. Keep the streak going and the crowd happy."
+    "intro": "Notes roll down a four-lane highway: press A, B, C or D as each one reaches its target. Long streaks multiply your points."
   },
   {
     "slug": "games/73",
@@ -339,6 +339,6 @@
     "slug": "games",
     "title": "The games room",
     "group": "Discover",
-    "intro": "Learn the controls, see the screens, and find your next challenge."
+    "intro": "Every game, how it unlocks and how it scores."
   }
 ]
