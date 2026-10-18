@@ -342,6 +342,12 @@
     "intro": "Eight holes of mini golf on one of two courses, drawn at random, each hole bigger than the screen. Aim, time the power slider and bank the ball off the walls into the cup in as few shots as you can."
   },
   {
+    "slug": "games/78",
+    "title": "Pool",
+    "group": "Games",
+    "intro": "8-ball against another Tamagotchi, the whole table on the screen. Pot your group, solids or rings, then the black 8."
+  },
+  {
     "slug": "games",
     "title": "The games room",
     "group": "Discover",
