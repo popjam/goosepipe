@@ -97,9 +97,9 @@
   },
   {
     "slug": "stats",
-    "title": "Stats & hearts",
+    "title": "Health & stats",
     "group": "Daily care",
-    "intro": "The Stats pages show your Tama\u2019s needs, skills and identity."
+    "intro": "The heart icon opens Stats. Health shows your Tama\u2019s needs, energy, skills and identity on seven pages. Personality is not open yet."
   },
   {
     "slug": "world",
