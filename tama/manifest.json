@@ -27,7 +27,7 @@
     "slug": "evolution",
     "title": "Growing up",
     "group": "Discover",
-    "intro": "Your Tama grows from an egg to an elder. Its care decides which forms it takes."
+    "intro": "Your Tama grows from an egg to an elder, then a geriatric. Its care decides which forms it takes."
   },
   {
     "slug": "fishing",
@@ -186,10 +186,16 @@
     "intro": "A adult form."
   },
   {
+    "slug": "characters/14",
+    "title": "Ojitchi",
+    "group": "Characters",
+    "intro": "A geriatric form."
+  },
+  {
     "slug": "characters",
     "title": "Meet the characters",
     "group": "Discover",
-    "intro": "13 characters, from egg to elder, with each form\u2019s traits and animations."
+    "intro": "14 characters, from egg to geriatric, with each form\u2019s traits and animations."
   },
   {
     "slug": "games/17",
