@@ -647,6 +647,7 @@
     for (const raw of text.split('\n')) {
       const line = raw.trim();
       if (!line) { flush(); continue; }
+      if (line.startsWith('RULES:')) continue;
       if (/^[A-Z][A-Z :,']+$/.test(line) && line.length < 60) { flush(); out.push(`<h3>${esc(cap(line.replace(/^RULES: /, '').toLowerCase()))}</h3>`); continue; }
       const m = line.match(/^(-|\d+\.)\s+(.*)$/);
       if (m) { const tag = m[1] === '-' ? 'ul' : 'ol'; if (!cur || cur.tag !== tag) { flush(); cur = { tag, items: [] }; } cur.items.push(rich(m[2])); continue; }
@@ -687,14 +688,14 @@
   async function viewSim(id) {
     page('<div class="loading" role="status">Loading the simulation set</div>');
     let s; try { s = await getData(`sims/${id}.json`); } catch { page('<div class="empty"><b>This simulation set could not be loaded.</b><a class="btn" href="#/sims">Back</a></div>'); return; }
-    const bars = (rows, fmt = (v) => v) => { const max = Math.max(...rows.map((r) => r.share), .0001); return `<div class="dist">${rows.map((r) => `<div class="dist-row"><span>${fmt(r.value)}</span><i><b style="width:${r.share / max * 100}%"></b></i><em>${pct(r.share)}</em></div>`).join('')}</div>`; };
+    const bars = (all, fmt = (v) => v) => { const rows = all.filter((r) => r.share >= .005); const max = Math.max(...rows.map((r) => r.share), .0001); return `<div class="dist">${rows.map((r) => `<div class="dist-row"><span>${fmt(r.value)}</span><i><b style="width:${r.share / max * 100}%"></b></i><em>${pct(r.share)}</em></div>`).join('')}</div>`; };
     const cols = [['name', 'Animal'], ['dealt', 'Dealt'], ['effect_rate', 'Did something'], ['blocked_rate', 'Hugged'], ['eggs_moved', 'Eggs moved'], ['eggs_self', 'Eggs for itself']];
     const rolesTable = () => {
       const rows = s.roles.filter((r) => r.dealt).sort((a, b) => { const x = a[SORT.key] ?? -1, y = b[SORT.key] ?? -1; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * SORT.dir; });
       return `<div class="scroll-x"><table class="data"><thead><tr>${cols.map(([k, l]) => `<th><button type="button" data-sort="${k}" class="${SORT.key === k ? 'on' : ''}">${l}${SORT.key === k ? (SORT.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`).join('')}</tr></thead>
         <tbody>${rows.map((r) => `<tr><th>${cchip(r.name)}</th><td>${r.dealt}</td><td><span class="ibar"><i style="width:${r.effect_rate * 100}%"></i></span>${pct(r.effect_rate)}</td><td>${pct(r.blocked_rate)}</td><td>${r.eggs_moved}</td><td>${r.eggs_self}</td></tr>`).join('')}</tbody></table></div>`;
     };
-    const dealt = s.roles.filter((r) => r.dealt >= 20);
+    const dealt = s.roles.filter((r) => r.dealt >= Math.max(5, s.games / 25));
     const quiet = [...dealt].sort((a, b) => a.effect_rate - b.effect_rate).slice(0, 5);
     const movers = [...dealt].sort((a, b) => b.eggs_moved - a.eggs_moved).slice(0, 5);
     const ov = (((s.settings || {}).overrides) || []).map(describe).filter(Boolean);
@@ -854,7 +855,7 @@
         <div class="fcell"><b>Players</b>${stepper('players', nPlayers(), 4, 8)}</div>
         <div class="fcell"><b>Rounds</b>${stepper('rounds', nRounds(), 1, 10)}</div>
         ${B.kind === 'sim' ? `<div class="fcell"><b>Games</b><div class="seg small">${[100, 500, 1000, 3000].map((n) => `<button type="button" class="${B.games === n ? 'on' : ''}" data-set="games" data-value="${n}">${n}</button>`).join('')}</div></div>` : ''}
-        <div class="fcell"><b>Seed</b><div class="seedbox"><input type="number" inputmode="numeric" id="seed" value="${esc(B.seed)}" placeholder="Random" aria-label="Seed"><button type="button" class="icon-btn" data-act="dice" aria-label="Pick a random seed">${ui('dice', 18)}</button></div></div>
+        <div class="fcell seedcell"><b>Seed</b><div class="seedbox"><input type="number" inputmode="numeric" id="seed" value="${esc(B.seed)}" placeholder="Random" aria-label="Seed"><button type="button" class="icon-btn" data-act="dice" aria-label="Pick a random seed">${ui('dice', 18)}</button></div></div>
       </div><p class="fine">The same seed gives the same starting deck, hands and Meowfia rolls, so two versions can be compared fairly.</p>`;
   }
   function drawPlayers() {
