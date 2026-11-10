@@ -1081,8 +1081,9 @@
   }
 
   /* ================= playing a seat ================= */
-  // The page holds one request open to the PC; it answers the moment anything changes, so there is no polling lag.
-  const P = { id: null, alive: false, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '' };
+  // Laid out like a chat app: a slim bar of players, the conversation, and a dock at the bottom for your move.
+  // The page holds one request open to the PC, which answers the moment anything changes: no polling lag.
+  const P = { id: null, alive: false, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '', items: [], unseen: 0 };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let nameRx = null;
   function linkCards(html) {                     // card names in Storyteller text become tappable
@@ -1095,39 +1096,48 @@
       .filter((l) => l.trim()).join('\n');
   }
   const para = (text, link) => tidy(text).split('\n').map((l) => `<p>${link ? linkCards(esc(l)) : esc(l)}</p>`).join('');
+  const seatTok = (name) => `<span class="av s tok">${eggToken(P.data.players.indexOf(name))}</span>`;
   function feedItem(x, me) {
     const t = x.text;
-    if (x.k === 'header') return `<div class="f-head"><span>${esc(t.replace(/=/g, '').trim())}</span></div>`;
-    if (x.k === 'beat') return `<div class="f-beat">${esc(t.replace(/-/g, '').trim())}</div>`;
+    if (x.k === 'header') return `<div class="f-head"><span>${esc(cap(t.replace(/=/g, '').trim().replace(/^Round \d+: /, '')))}</span></div>`;
+    if (x.k === 'beat') return '';
     if (x.k === 'say') {
       const anon = !t.startsWith(x.sp + ':'), who = anon ? 'Someone' : x.sp, mine = x.sp === me && !anon;
       const body = t.slice(t.indexOf(':') + 1).trim();
-      return `<div class="f-msg${mine ? ' mine' : ''}">${mine ? '' : `<span class="av s tok">${anon ? '' : eggToken(P.data.players.indexOf(who))}</span>`}<div><div class="f-who">${mine ? 'You' : esc(who)}</div><div class="bubble">${esc(body)}</div></div></div>`;
+      return `<div class="f-msg${mine ? ' mine' : ''}">${mine ? '' : anon ? '<span class="av s tok anon">?</span>' : seatTok(who)}<div class="f-col">${mine ? '' : `<div class="f-who">${esc(who)}</div>`}<div class="bubble">${esc(body)}</div></div></div>`;
     }
     if (x.k === 'whisper') {
       const mine = x.sp === me, body = t.slice(t.indexOf(':') + 1).trim(), head = t.slice(0, t.indexOf(':'));
-      return `<div class="f-msg whisper${mine ? ' mine' : ''}">${mine ? '' : `<span class="av s tok">${eggToken(P.data.players.indexOf(x.sp))}</span>`}<div><div class="f-who">${esc(mine ? head.replace(x.sp + ' whispers', 'You whisper') : head.replace(' to ' + me, ' to you'))}</div><div class="bubble">${esc(body)}</div></div></div>`;
+      return `<div class="f-msg whisper${mine ? ' mine' : ''}">${mine ? '' : seatTok(x.sp)}<div class="f-col"><div class="f-who">${esc(mine ? head.replace(x.sp + ' whispers', 'You whisper') : head.replace(' to ' + me, ' to you'))}</div><div class="bubble">${esc(body)}</div></div></div>`;
     }
     if (x.k === 'caw') return `<div class="f-sys caw">${esc(t)}</div>`;
     if (x.k === 'death') return `<div class="f-sys death">${esc(t)}</div>`;
-    if (t.startsWith('Nest sizes:')) return '';
-    if (x.priv) return `<div class="f-priv"><div class="f-priv-top">${ui('eyeoff', 13)}Only you see this</div>${para(t, true)}</div>`;
+    if (t.startsWith('Nest sizes:') || t.startsWith('The game begins')) return '';
+    if (x.priv) return `<div class="f-priv"><div class="f-priv-top">${ui('eyeoff', 12)}Only you</div>${para(t, true)}</div>`;
     return `<div class="f-story">${para(t, true)}</div>`;
   }
   const phaseOf = (items) => { for (let i = items.length - 1; i >= 0; i--) if (items[i].k === 'header') { const m = items[i].text.replace(/=/g, '').trim().split(':'); return cap((m[1] || 'setup').trim()); } return 'Setup'; };
+  const atBottom = (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 70;
+  function toBottom(smooth) { const f = $('#feed'); if (f) { f.scrollTo({ top: f.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); P.unseen = 0; const b = $('#fnew'); if (b) b.hidden = true; } }
 
   async function viewPlay(id) {
     if (!canCall()) { page(`<div class="empty"><b>Playing happens on your PC's copy of the site.</b><span>Open it from a device on your Tailscale network.</span>${D.config.control && D.config.control !== 'SELF' ? `<a class="btn primary" href="${esc(D.config.control)}/#/play/${encodeURIComponent(id)}">Open it there</a>` : ''}</div>`); return; }
     document.body.classList.add('playing');
     document.title = 'Playing · Meowfia Lab';
-    Object.assign(P, { id, alive: true, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '', items: [], phase: 'Setup' });
+    Object.assign(P, { id, alive: true, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '', items: [], phase: 'Setup', unseen: 0, ghost: '' });
     app.innerHTML = `<div class="play" id="play"><header class="play-top"><a class="icon-btn" href="#/run" aria-label="Leave the table">${ui('back', 20)}</a>
         <div class="play-phase" id="pphase"><b>Meowfia</b><span>Connecting</span></div>
         <button type="button" class="icon-btn" id="ppool" aria-label="Cards in the pool">${ui('pool', 20)}</button><button type="button" class="icon-btn" id="prules" aria-label="Rules">${ui('rules', 20)}</button></header>
       <div class="play-body"><aside class="hud" id="hud"></aside>
-        <section class="play-main"><div class="feed" id="feed" aria-live="polite"><div class="loading">Taking your seat</div></div><div class="turn" id="turn"></div></section></div></div>`;
+        <section class="play-main"><div class="mhud" id="mhud"></div>
+          <div class="feed-wrap"><div class="feed" id="feed"><div class="loading">Taking your seat</div></div>
+            <button type="button" class="f-new" id="fnew" hidden>${ui('down', 14)}<span>New</span></button></div>
+          <div class="turn" id="turn"></div></section></div></div>`;
     $('#prules').onclick = () => { const v = D.variants.find((x) => x.name === (P.data || {}).variant) || D.variants[0]; openSheet(`<h2>Rules</h2><div class="rules-text flat">${rulesHTML(v.rules)}</div>`, 'Rules'); };
     $('#ppool').onclick = () => { const st = (P.data || {}).state || {}; openSheet(`<h2>In the pool</h2><p class="fine">Tap a card to read it.</p>${(st.flowers || []).length ? `<h4>Flowers this round</h4><div class="pills">${st.flowers.map((f) => cchip(f)).join('')}</div>` : ''}<h4>Animals</h4><div class="pills">${(st.pool || []).map((x) => cchip(x)).join('')}</div>`, 'In the pool'); };
+    $('#feed').addEventListener('scroll', () => { if (atBottom($('#feed'))) { P.unseen = 0; $('#fnew').hidden = true; } }, { passive: true });
+    $('#fnew').onclick = () => toBottom(true);
+    $('#mhud').addEventListener('click', (e) => { if (e.target.closest('[data-me]')) openMe(); });
     wireTurn();
     const mine = id;
     const hold = !store.get('nowait', false);      // a test switch: ask once a second instead of holding the line
@@ -1137,9 +1147,7 @@
         if (!P.alive || P.id !== mine) break;
         applyPlay(r);
         if (!hold) await sleep(1000);
-        if (r.status !== 'running' && r.status !== 'queued') {      // nothing more will happen until it is resumed
-          await sleep(4000);
-        }
+        if (r.status !== 'running' && r.status !== 'queued') await sleep(4000);     // nothing more until it is resumed
       } catch (e) {
         if (!P.alive || P.id !== mine) break;
         if (!P.data) { $('#feed').innerHTML = `<div class="empty"><b>This game could not be opened.</b><span>${esc(e.message === 'unreachable' ? 'The PC is not reachable.' : e.message)}</span><a class="btn" href="#/run">Back</a></div>`; if (/no such|nobody/.test(e.message)) break; }
@@ -1153,22 +1161,33 @@
     const first = !P.data;
     P.data = r; P.token = r.token;
     const feed = $('#feed'); if (!feed) return;
-    const near = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 80;
-    if (first) feed.innerHTML = '';
+    const near = first || atBottom(feed);
+    if (first) feed.innerHTML = '<div class="f-typing" id="ftyping" hidden></div>';
     if (r.items.length) {
+      const html = r.items.map((x) => feedItem(x, r.me)).join('');
+      if (P.ghost && r.items.some((x) => x.k === 'say' && x.sp === r.me)) { P.ghost = ''; const g = $('#fghost'); if (g) g.remove(); }
+      $('#ftyping').insertAdjacentHTML('beforebegin', first ? html : html.replace(/class="f-/g, 'class="in f-'));
       P.items = P.items.concat(r.items);
-      feed.insertAdjacentHTML('beforeend', r.items.map((x) => feedItem(x, r.me)).join(''));
       P.total = r.total;
       P.phase = phaseOf(P.items);
-      if (first || near) feed.scrollTop = feed.scrollHeight;
+      if (!near && html) { P.unseen += r.items.length; $('#fnew').hidden = false; }
     }
     const s = r.state || {};
     $('#pphase').innerHTML = `<b>${s.round ? `Round ${s.round} of ${s.rounds}` : esc(r.variant)}</b><span>${esc(r.over ? 'Game over' : P.phase)}</span>`;
     drawHud(r);
     drawTurn(r);
-    if (first || near) feed.scrollTop = feed.scrollHeight;
+    drawTyping(r);
+    if (near) toBottom(!first);
+  }
+  function drawTyping(r) {                       // who is thinking, shown where the next message will appear
+    const el = $('#ftyping'); if (!el) return;
+    const others = ((r.state || {}).asking || []).filter((n) => n !== r.me);
+    const on = r.status === 'running' && !r.over && others.length > 0;
+    el.hidden = !on;
+    if (on) el.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>${esc(list(others))} ${others.length === 1 ? 'is' : 'are'} thinking`;
   }
 
+  const eggOf = (c) => { const wild = c.id[0] === 'W'; return `<span class="egg ${wild ? 'wild' : 'HD'.includes(c.id[0]) ? 'red' : 'black'}">${wild ? 'W' : c.value}<i>${wild ? '' : SUIT[c.id[0]]}</i></span>`; };
   function drawHud(r) {
     const s = r.state; if (!s) return;
     const key = JSON.stringify(s);
@@ -1176,21 +1195,34 @@
     P.hud = key;
     const me = s.me, cards = {}; for (const c of me.hand) cards[c.id] = c;
     P.cards = cards;
-    const eggOf = (c) => { const wild = c.id[0] === 'W'; return `<span class="egg ${wild ? 'wild' : 'HD'.includes(c.id[0]) ? 'red' : 'black'}">${wild ? 'W' : c.value}<i>${wild ? '' : SUIT[c.id[0]]}</i></span>`; };
     const asking = new Set(s.asking || []);
-    $('#hud').innerHTML = `<section class="hud-you ${sideClass(me.alignment)}">
-        <button type="button" class="hud-me" ${me.role ? `data-card="${esc(me.role)}"` : ''}><span class="av l ${sideClass(me.alignment)}">${me.role ? icon(me.role) : eggToken(r.players.indexOf(me.name))}</span>
+    const side = sideClass(me.alignment);
+    // phone: one rail of players and one line for your animal and nest
+    $('#mhud').innerHTML = `<div class="mrail">${s.players.map((p) => { const mine = p.name === me.name; return `<${mine ? 'button type="button" data-me' : 'div'} class="mp${mine ? ' me' : ''}${p.dead ? ' dead' : ''}"><span class="mp-face"><span class="av tok ${mine ? side : ''}">${mine && me.role ? icon(me.role) : eggToken(r.players.indexOf(p.name))}</span>${asking.has(p.name) ? '<i class="think"></i>' : ''}${p.nest === null ? '' : `<i class="mp-n">${p.nest}</i>`}</span><b>${mine ? 'You' : esc(p.name)}</b></${mine ? 'button' : 'div'}>`; }).join('')}</div>
+      <div class="mnest"><button type="button" class="mrole ${side}" data-me>${me.role ? esc(me.role) : 'Dealing'}${me.alignment ? `<small>${esc(me.alignment)}</small>` : ''}</button><div class="eggs">${me.hand.map(eggOf).join('') || '<span class="muted">Empty nest</span>'}</div></div>`;
+    // wide screens: a side column with the same things spelled out
+    $('#hud').innerHTML = `<section class="hud-you ${side}">
+        <button type="button" class="hud-me" ${me.role ? `data-card="${esc(me.role)}"` : ''}><span class="av l ${side}">${me.role ? icon(me.role) : eggToken(r.players.indexOf(me.name))}</span>
           <span class="hud-me-text"><small>You are ${esc(me.name)}</small><b>${me.role ? 'The ' + esc(me.role) : 'Waiting for the deal'}</b><span class="pills">${sidePill(me.alignment)}${me.dead ? pill('Dead', 'muted') : ''}${me.winks ? pill(plural(me.winks, 'Wink'), 'yolk') : ''}</span></span></button>
         <div class="hud-nest"><span class="label">Your nest · ${me.hand.length}</span><div class="eggs">${me.hand.map(eggOf).join('') || '<span class="muted">Empty</span>'}</div></div>
         <div class="hud-bank">${ui('scores', 14)}<span><b>${me.banked + me.hand.length}</b> points so far</span><small>${me.banked} banked, ${me.hand.length} kept</small></div></section>
-      <section class="hud-table"><span class="label">The table</span><div class="hud-players">${s.players.map((p) => `<div class="hud-p${p.dead ? ' dead' : ''}${p.name === me.name ? ' me' : ''}"><span class="av tok">${eggToken(r.players.indexOf(p.name))}${asking.has(p.name) ? '<i class="think"></i>' : ''}</span><b>${p.name === me.name ? 'You' : esc(p.name)}</b><small>${p.dead ? 'dead' : p.nest === null ? 'hidden' : plural(p.nest, 'egg')}${p.name === s.dealer ? '<em> · dealer</em>' : ''}</small></div>`).join('')}</div></section>
+      <section class="hud-table"><span class="label">The table</span><div class="hud-players">${s.players.map((p) => `<div class="hud-p${p.dead ? ' dead' : ''}${p.name === me.name ? ' me' : ''}"><span class="av tok">${eggToken(r.players.indexOf(p.name))}${asking.has(p.name) ? '<i class="think"></i>' : ''}</span><b>${p.name === me.name ? 'You' : esc(p.name)}</b><small>${p.dead ? 'dead' : p.nest === null ? 'hidden' : plural(p.nest, 'egg')}${p.name === s.dealer ? ' · dealer' : ''}</small></div>`).join('')}</div></section>
       <section class="hud-pool"><span class="label">In the pool</span><div class="hud-chips">${(s.flowers || []).map((f) => cchip(f)).join('')}${(s.pool || []).map((a) => cchip(a)).join('')}</div></section>`;
   }
+  function openMe() {
+    const s = (P.data || {}).state; if (!s) return;
+    const me = s.me, c = D.card[me.role];
+    openSheet(`<header class="sheet-who"><span class="av xl ${sideClass(me.alignment)}">${me.role ? icon(me.role) : eggToken(0)}</span><div><h2>${me.role ? 'The ' + esc(me.role) : esc(me.name)}</h2><div class="pills">${sidePill(me.alignment)}${me.dead ? pill('Dead', 'muted') : ''}${me.winks ? pill(plural(me.winks, 'Wink'), 'yolk') : ''}</div></div></header>
+      ${c ? `<p class="me-text">${esc(((D.variants.find((v) => v.name === P.data.variant) || {}).settings || {}).text && D.variants.find((v) => v.name === P.data.variant).settings.text[me.role] || c.text)}</p>` : ''}
+      <h4>Your nest · ${me.hand.length}</h4><div class="eggs roomy">${me.hand.map(eggOf).join('') || '<span class="muted">Empty</span>'}</div>
+      <h4>Your score</h4><p><b>${me.banked + me.hand.length}</b> points so far: ${me.banked} banked and ${me.hand.length} for cards kept.</p>
+      <p class="fine">${me.alignment === 'Meowfia' ? 'You are Meowfia this round: get a Farm player eggsecuted.' : me.alignment === 'Farm' ? 'You are Farm this round: get a Meowfia player eggsecuted.' : ''}</p>`, 'You');
+  }
 
-  /* ----- your turn ----- */
-  const blankTurn = () => ({ targets: [], role: null, number: null, cards: [], say: '', caw: false, wto: '', wtext: '', act: '', aplayer: '', aanimal: '', guesses: {} });
-  const TARGET_LABELS = { Gecko: ['Copy whose animal?', 'Use it on whom?'], Copycat: ['Copy whose animal?', 'Use it on whom?'], 'Rag Doll': ['Who do you visit?', 'Where are they sent instead?'], 'Cat Burgler': ['Who do you steal from?', 'Who gets the eggs?'] };
-  const ACTION = { wink: ['Wink at someone', 'They die at once. Nobody is told it was you.'], bond: ['Offer a handshake', 'Golden Wattle: bond with a player.'], touch: ['Touch someone', 'Stinging Bush: they die.'], sunflower: ['Use the Sunflower', 'Spend an egg to learn if a player is a certain animal.'], challenge: ['Challenge', 'Guess every animal. Right: you win alone. Wrong: you die.'], double_down: ['Double down', 'Crimson Kunzea: double your score this round.'] };
+  /* ----- your move ----- */
+  const blankTurn = () => ({ targets: [], role: null, number: null, cards: [], say: '', caw: false, more: false, wopen: false, wto: '', wtext: '', act: '', aplayer: '', aanimal: '', guesses: {} });
+  const TARGET_LABELS = { Gecko: ['Copy whose animal?', 'then use it on whom?'], Copycat: ['Copy whose animal?', 'then use it on whom?'], 'Rag Doll': ['Visit whom?', 'then send them where?'], 'Cat Burgler': ['Steal from whom?', 'then who gets the eggs?'] };
+  const ACTION = { wink: ['Wink', 'They die at once. Nobody is told it was you.'], bond: ['Handshake', 'Golden Wattle: bond with a player.'], touch: ['Touch', 'Stinging Bush: they die.'], sunflower: ['Sunflower', 'Spend an egg to learn if a player is a certain animal.'], challenge: ['Challenge', 'Guess every animal. Right: you win alone. Wrong: you die.'], double_down: ['Double down', 'Crimson Kunzea: double your score this round.'] };
   function words(s) { return s.trim() ? s.trim().split(/\s+/).length : 0; }
   function turnValid(pd, u) {
     const f = pd.fields;
@@ -1209,60 +1241,64 @@
     if (pd.kind === 'discard') return `Discard ${plural(u.cards.length, 'card')}`;
     if (pd.kind === 'extend') return u.cards.length ? 'Pay one egg' : 'Don\'t pay';
     if (pd.kind === 'vote') { const n = pd.fields.cards ? u.cards.length : u.number; return u.targets[0] ? `Throw ${plural(n || 0, 'egg')} at ${u.targets[0]}` : 'Choose who to egg'; }
-    if (u.act) return ACTION[u.act][0];
-    if (u.say.trim() || u.wtext.trim()) return 'Send';
-    return u.caw ? 'Call CAW CAW' : 'Stay quiet';
+    return '';
   }
+  const dayIdle = (u) => !u.say.trim() && !u.wtext.trim() && !u.act && !u.caw;
+  const sendInner = (u) => (dayIdle(u) ? '<span>Pass</span>' : ui('send', 20));
   function playerPick(pd, u, s) {
     const f = pd.fields.targets, max = f.max ?? 1, labels = TARGET_LABELS[s.me.role];
-    const head = pd.kind === 'vote' ? 'Who do you throw at?' : max === 2 ? (labels ? `${labels[0]} Then: ${labels[1].toLowerCase()}` : 'Choose two players, in order') : 'Who do you visit?';
-    return `<div class="t-field"><span class="label">${esc(head)}</span><div class="t-players">${f.options.map((n) => {
+    const head = pd.kind === 'vote' ? 'Throw at' : max === 2 ? (labels ? labels[u.targets.length ? 1 : 0] : 'Choose two, in order') : 'Visit';
+    return `<div class="t-field"><span class="label">${esc(cap(head))}</span><div class="t-players">${f.options.map((n) => {
       const i = u.targets.indexOf(n), p = s.players.find((x) => x.name === n) || {};
-      const face = n === 'Bottlebrush' ? `<span class="av tok">${icon('Bottlebrush')}</span>` : n === 'Nobody' ? `<span class="av tok">${MeowIcons.svg('?', 'unknown')}</span>` : `<span class="av tok">${eggToken(P.data.players.indexOf(n))}</span>`;
-      return `<button type="button" class="t-player${i >= 0 ? ' on' : ''}${p.dead ? ' dead' : ''}" data-target="${esc(n)}" aria-pressed="${i >= 0}">${face}<b>${esc(n)}</b>${max > 1 && i >= 0 ? `<i class="ord">${i + 1}</i>` : ''}${p.dead ? '<small>dead</small>' : ''}</button>`;
+      const face = n === 'Bottlebrush' ? icon('Bottlebrush') : n === 'Nobody' ? MeowIcons.svg('?', 'unknown') : eggToken(P.data.players.indexOf(n));
+      return `<button type="button" class="t-player${i >= 0 ? ' on' : ''}${p.dead ? ' dead' : ''}" data-target="${esc(n)}" aria-pressed="${i >= 0}"><span class="av tok">${face}</span><b>${esc(n)}</b>${max > 1 && i >= 0 ? `<i class="ord">${i + 1}</i>` : ''}</button>`;
     }).join('')}</div></div>`;
   }
   function cardPick(pd, u, label) {
     const f = pd.fields.cards, sum = u.cards.reduce((a, id) => a + ((P.cards[id] || {}).value || 0), 0);
-    return `<div class="t-field"><span class="label">${esc(label)}${u.cards.length ? ` · ${u.cards.length} chosen, worth ${sum}` : ''}</span><div class="t-cards">${[...f.options].sort((x, y) => (((P.cards[x] || {}).value || 0) - ((P.cards[y] || {}).value || 0)) || x.localeCompare(y)).map((id) => { const c = P.cards[id] || { id, value: '?' }; const wild = id[0] === 'W'; return `<button type="button" class="egg big ${wild ? 'wild' : 'HD'.includes(id[0]) ? 'red' : 'black'}${u.cards.includes(id) ? ' on' : ''}" data-egg="${esc(id)}" aria-pressed="${u.cards.includes(id)}">${wild ? 'W' : c.value}<i>${wild ? '' : SUIT[id[0]]}</i></button>`; }).join('')}</div></div>`;
+    const range = f.min === f.max ? `pick ${f.min}` : f.max >= f.options.length ? (f.min ? `at least ${f.min}` : 'optional') : `${f.min} to ${f.max}`;
+    return `<div class="t-field"><span class="label">${esc(label)} · ${u.cards.length ? `${u.cards.length} chosen, worth ${sum}` : range}</span><div class="t-cards">${[...f.options].sort((x, y) => (((P.cards[x] || {}).value || 0) - ((P.cards[y] || {}).value || 0)) || x.localeCompare(y)).map((id) => { const c = P.cards[id] || { id, value: '?' }; const wild = id[0] === 'W'; return `<button type="button" class="egg big ${wild ? 'wild' : 'HD'.includes(id[0]) ? 'red' : 'black'}${u.cards.includes(id) ? ' on' : ''}" data-egg="${esc(id)}" aria-pressed="${u.cards.includes(id)}">${wild ? 'W' : c.value}<i>${wild ? '' : SUIT[id[0]]}</i></button>`; }).join('')}</div></div>`;
   }
   const animalSelect = (attr, options, value, none) => `<select ${attr}><option value="">${esc(none)}</option>${options.map((a) => `<option ${a === value ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select>`;
   function turnBody(pd, u, s, r) {
-    const f = pd.fields, me = s.me, role = D.card[me.role];
+    const f = pd.fields, me = s.me;
     let h = '';
     if (pd.kind === 'night') {
-      h += `<div class="t-head"><b>Night. You are the ${esc(me.role)}.</b><span>${esc(role ? role.text : '')}</span></div>`;
+      h += `<div class="t-head"><b>Night</b><button type="button" class="t-role" data-me>You are the ${esc(me.role)}${ui('info', 14)}</button></div>`;
       if (f.targets) h += playerPick(pd, u, s);
-      if (f.role && f.role.options.length) h += `<div class="t-field"><span class="label">${f.role.required === false ? 'Name an animal (only if the copied animal needs one)' : 'Name an animal'}</span><div class="t-roles">${f.role.options.map((a) => `<button type="button" class="cchip ${typeOf(a)}${u.role === a ? ' on' : ''}" data-hold data-card="${esc(a)}" data-role="${esc(a)}"><span class="cchip-art">${icon(a)}</span><span>${esc(a)}</span></button>`).join('')}</div></div>`;
-      if (f.number) h += `<div class="t-field row"><span class="label">How many stolen eggs to pass on</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
+      if (f.role && f.role.options.length) h += `<div class="t-field"><span class="label">${f.role.required === false ? 'Name an animal (only if needed)' : 'Name an animal'}</span><div class="t-roles">${f.role.options.map((a) => `<button type="button" class="cchip ${typeOf(a)}${u.role === a ? ' on' : ''}" data-hold data-card="${esc(a)}" data-role="${esc(a)}"><span class="cchip-art">${icon(a)}</span><span>${esc(a)}</span></button>`).join('')}</div></div>`;
+      if (f.number) h += `<div class="t-field row"><span class="label">Stolen eggs to pass on</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
     } else if (pd.kind === 'discard') {
-      h += `<div class="t-head"><b>You lost ${plural(f.cards.min, 'egg')} in the night.</b><span>Choose which ${f.cards.min === 1 ? 'card' : 'cards'} to discard.</span></div>${cardPick(pd, u, 'Your nest')}`;
+      h += `<div class="t-head"><b>You lost ${plural(f.cards.min, 'egg')}</b><span>Choose what to discard.</span></div>${cardPick(pd, u, 'Your nest')}`;
     } else if (pd.kind === 'extend') {
-      h += `<div class="t-head"><b>The day is about to end.</b><span>Mulberry: anyone may pay one egg for one more turn of talk.</span></div>${cardPick(pd, u, 'Pay with')}`;
+      h += `<div class="t-head"><b>The day is ending</b><span>Mulberry: pay one egg for one more turn of talk?</span></div>${cardPick(pd, u, 'Pay with')}`;
     } else if (pd.kind === 'vote') {
-      h += `<div class="t-head"><b>Eggsecution.</b><span>Throw eggs at who you think is Meowfia${me.alignment === 'Meowfia' ? ' (you are Meowfia: get a Farm player out)' : ''}. Thrown cards bank at full value if your side wins the round; kept cards are worth 1.${me.dead ? ' You are dead: your eggs score but are not votes.' : ''}</span></div>${playerPick(pd, u, s)}`;
-      h += f.cards ? cardPick(pd, u, 'Which eggs') : `<div class="t-field row"><span class="label">How many eggs (the Poppy picks which)</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
+      h += `<div class="t-head"><b>Eggsecution</b><span>${me.alignment === 'Meowfia' ? 'You are Meowfia: get a Farm player out.' : 'Egg who you think is Meowfia.'}${me.dead ? ' You are dead: your eggs score but are not votes.' : ''}</span></div>${playerPick(pd, u, s)}`;
+      h += f.cards ? cardPick(pd, u, 'Eggs') : `<div class="t-field row"><span class="label">How many eggs (the Poppy picks which)</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
     } else {
-      const limit = (f.say || {}).words || 80, n = words(u.say);
+      const limit = (f.say || {}).words || 80, n = words(u.say), acts = (f.special || {}).actions || [];
       const noise = /Banksia/.test(pd.prompt);
-      h += `<div class="t-say"><textarea id="tsay" rows="2" placeholder="${noise ? 'Banksia: only bird or cat noises aloud' : 'Say something to the table'}" aria-label="Say something">${esc(u.say)}</textarea><span class="t-count${n > limit ? ' over' : ''}" id="tcount">${n}/${limit}</span></div>`;
-      const acts = (f.special || {}).actions || [];
-      h += `<div class="t-tools"><button type="button" class="fchip${u.caw ? ' on' : ''}" data-caw aria-pressed="${u.caw}">CAW CAW</button>
-        ${f.whisper ? `<button type="button" class="fchip${u.wopen ? ' on' : ''}" data-wopen>Whisper</button>` : ''}
-        ${acts.map((a) => `<button type="button" class="fchip${u.act === a ? ' on' : ''}" data-action="${a}">${esc(ACTION[a][0])}</button>`).join('')}</div>`;
-      if (u.caw) h += `<p class="t-note">CAW CAW asks to end the talk and vote. It takes ${r.day.caw_caw_needed} players.</p>`;
+      const tags = (u.caw ? '<button type="button" class="c-tag" data-caw>CAW CAW<b>×</b></button>' : '') + (u.act ? `<button type="button" class="c-tag" data-action="${u.act}">${esc(ACTION[u.act][0])}<b>×</b></button>` : '') + (u.wopen ? '<button type="button" class="c-tag" data-wopen>Whisper<b>×</b></button>' : '');
+      if (u.more) h += `<div class="c-more"><button type="button" class="c-opt${u.caw ? ' on' : ''}" data-caw><b>CAW CAW</b><span>Ask to end the talk and vote. It takes ${r.day.caw_caw_needed} players.</span></button>
+        ${f.whisper ? `<button type="button" class="c-opt${u.wopen ? ' on' : ''}" data-wopen><b>Whisper</b><span>Say something only one player hears.</span></button>` : ''}
+        ${acts.map((a) => `<button type="button" class="c-opt${u.act === a ? ' on' : ''}" data-action="${a}"><b>${esc(ACTION[a][0])}</b><span>${esc(ACTION[a][1])}</span></button>`).join('')}</div>`;
       if (f.whisper && u.wopen) h += `<div class="t-extra"><select data-wto><option value="">Whisper to…</option>${f.whisper.options.map((n2) => `<option ${u.wto === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select><input type="text" id="twtext" placeholder="Only they will hear this" value="${esc(u.wtext)}" autocomplete="off"></div>`;
       if (u.act) {
         const sp = f.special;
-        h += `<div class="t-extra col"><p class="t-note">${esc(ACTION[u.act][1])}</p>`;
-        if (['wink', 'bond', 'touch', 'sunflower'].includes(u.act)) h += `<select data-aplayer><option value="">Choose a player…</option>${sp.players.map((n2) => `<option ${u.aplayer === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select>`;
-        if (u.act === 'sunflower') h += animalSelect('data-aanimal', s.pool, u.aanimal, 'Are they the…') + cardPick(pd, u, 'Egg to spend (one)');
+        h += '<div class="t-extra col">';
+        if (['wink', 'bond', 'touch', 'sunflower'].includes(u.act)) h += `<select data-aplayer><option value="">${esc(ACTION[u.act][0])}: choose a player…</option>${sp.players.map((n2) => `<option ${u.aplayer === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select>`;
+        if (u.act === 'sunflower') h += animalSelect('data-aanimal', s.pool, u.aanimal, 'Are they the…') + cardPick(pd, u, 'Egg to spend');
         if (u.act === 'challenge') h += `<div class="t-guess">${sp.players.map((n2) => `<label><span>${esc(n2)}</span>${animalSelect(`data-guess="${esc(n2)}"`, s.pool, u.guesses[n2], 'is the…')}</label>`).join('')}</div>${f.cards ? cardPick(pd, u, 'Your bet') : ''}`;
         h += '</div>';
       }
+      if (tags) h += `<div class="c-tags">${tags}</div>`;
+      h += `<div class="composer"><button type="button" class="c-plus${u.more ? ' on' : ''}" data-more aria-label="More actions" aria-expanded="${u.more}">${ui('plus', 20)}</button>
+        <div class="c-box"><textarea id="tsay" rows="1" enterkeyhint="send" placeholder="${noise ? 'Only bird or cat noises' : 'Message the table'}" aria-label="Message the table">${esc(u.say)}</textarea><span class="t-count${n > limit ? ' over' : ''}" id="tcount" ${n > limit * .7 ? '' : 'hidden'}>${n}/${limit}</span></div>
+        <button type="button" class="c-send${dayIdle(u) ? ' pass' : ''}" id="tsend" aria-label="Send" ${turnValid(pd, u) ? '' : 'disabled'}>${sendInner(u)}</button></div>`;
     }
     return h;
   }
+  function grow(t) { if (!t) return; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 116) + 'px'; }
   function drawTurn(r, force) {
     const box = $('#turn'); if (!box) return;
     const s = r.state, pd = r.pending;
@@ -1276,39 +1312,44 @@
       }
       key = 'turn:' + pd.id;
       if (!force && key === P.turnKey) return;
-      html = `<div class="turn-in yours"><div class="turn-fields">${turnBody(pd, P.u, s, r)}</div><button type="button" class="btn primary big" id="tsend" ${turnValid(pd, P.u) ? '' : 'disabled'}>${esc(submitLabel(pd, P.u))}</button></div>`;
+      const day = pd.kind === 'day';
+      html = `<div class="turn-in yours ${day ? 'day' : 'pick'}">${turnBody(pd, P.u, s, r)}${day ? '' : `<button type="button" class="btn primary big" id="tsend" ${turnValid(pd, P.u) ? '' : 'disabled'}>${esc(submitLabel(pd, P.u))}</button>`}</div>`;
       document.title = '● Your turn · Meowfia Lab';
     } else {
       document.title = 'Playing · Meowfia Lab';
       const others = ((s || {}).asking || []).filter((n) => n !== r.me);
-      let line, sub = '', extra = '';
-      if (r.status === 'queued') { line = 'The table is being set'; sub = 'The game starts in a moment.'; }
-      else if (r.status === 'done') { line = 'The game is over'; sub = 'Thanks for playing.'; extra = r.seats === 'claude' ? `<a class="btn primary" href="#/game/${encodeURIComponent(r.id)}">Read the replay</a>` : '<a class="btn" href="#/run">Play again</a>'; }
-      else if (r.status === 'stopped' || r.status === 'failed') { line = r.status === 'failed' ? 'The game hit a problem' : 'The game is stopped'; sub = 'You can continue it from the run page.'; extra = '<a class="btn" href="#/run">Run page</a>'; }
-      else if (r.over) { line = 'The game is over'; sub = 'The review is being written. The replay opens in a minute.'; }
-      else if (others.length) { line = `Waiting for ${list(others)}`; sub = P.sent ? 'Your move is in.' : 'They are thinking.'; }
-      else { line = 'The Storyteller is working'; sub = ''; }
-      key = 'wait:' + line + sub + r.status;
+      let line, extra = '';
+      if (r.status === 'queued') line = 'Setting the table…';
+      else if (r.status === 'done') { line = 'The game is over'; extra = r.seats === 'claude' ? `<a class="btn primary small" href="#/game/${encodeURIComponent(r.id)}">Read the replay</a>` : '<a class="btn small" href="#/run">Play again</a>'; }
+      else if (r.status === 'stopped' || r.status === 'failed') { line = r.status === 'failed' ? 'The game hit a problem' : 'The game is stopped'; extra = '<a class="btn small" href="#/run">Run page</a>'; }
+      else if (r.over) line = 'Game over. The review is being written…';
+      else if (others.length) line = P.sent ? 'Your move is in' : 'Waiting for the others';
+      else line = 'The Storyteller is working…';
+      key = 'wait:' + line + r.status;
       if (key === P.turnKey) return;
-      const busy = r.status === 'running' && !r.over || r.status === 'queued' || (r.over && r.status === 'running');
-      html = `<div class="turn-in waiting">${busy ? '<span class="dots"><i></i><i></i><i></i></span>' : ''}<div><b>${esc(line)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${extra}</div>`;
+      html = `<div class="turn-in waiting"><b>${esc(line)}</b>${extra}</div>`;
     }
     P.turnKey = key;
     const ta = document.activeElement, id = ta && box.contains(ta) ? ta.id : '', pos = id && ta.selectionStart;
+    const feed = $('#feed'), near = feed && atBottom(feed);
     box.innerHTML = html;
+    grow($('#tsay'));
     if (id && $('#' + id)) { const el = $('#' + id); el.focus({ preventScroll: true }); try { el.setSelectionRange(pos, pos); } catch { /* not a text field */ } }
-    const feed = $('#feed'); if (feed && feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 160) feed.scrollTop = feed.scrollHeight;
+    if (near) toBottom(false);
   }
   function refreshSend() {
     const pd = P.data && P.data.pending, b = $('#tsend'); if (!pd || !b) return;
-    b.disabled = !turnValid(pd, P.u); b.textContent = submitLabel(pd, P.u);
+    b.disabled = !turnValid(pd, P.u);
+    if (pd.kind === 'day') { b.innerHTML = sendInner(P.u); b.classList.toggle('pass', dayIdle(P.u)); } else b.textContent = submitLabel(pd, P.u);
   }
   function wireTurn() {
     const box = $('#turn');
     const redraw = () => drawTurn(P.data, true);
     box.addEventListener('click', async (e) => {
-      const pd = P.data && P.data.pending, u = P.u; if (!pd || !u) return;
-      const f = pd.fields, t = e.target;
+      const pd = P.data && P.data.pending, u = P.u, t = e.target;
+      if (t.closest('[data-me]')) return openMe();
+      if (!pd || !u) return;
+      const f = pd.fields;
       let el;
       if ((el = t.closest('[data-target]'))) {
         const n = el.dataset.target, max = f.targets.max ?? 1;
@@ -1323,31 +1364,41 @@
         if (u.cards.includes(id)) u.cards = u.cards.filter((x) => x !== id);
         else if (max === 1) u.cards = [id];
         else if (u.cards.length < max) u.cards.push(id);
+        else { toast(`You can choose at most ${max}.`); return; }
         return redraw();
       }
       if ((el = t.closest('[data-role]'))) { u.role = u.role === el.dataset.role ? null : el.dataset.role; return redraw(); }
       if ((el = t.closest('[data-stepper] button'))) { const st = el.closest('[data-stepper]'); u.number = Math.max(+st.dataset.min, Math.min(+st.dataset.max, (u.number ?? +st.dataset.min) + +el.dataset.dir)); return redraw(); }
-      if (t.closest('[data-caw]')) { u.caw = !u.caw; return redraw(); }
-      if (t.closest('[data-wopen]')) { u.wopen = !u.wopen; if (!u.wopen) { u.wto = ''; u.wtext = ''; } return redraw(); }
-      if ((el = t.closest('[data-action]'))) { u.act = u.act === el.dataset.action ? '' : el.dataset.action; u.cards = []; return redraw(); }
-      if (t.closest('#tsend')) {
+      if (t.closest('[data-more]')) { u.more = !u.more; return redraw(); }
+      if (t.closest('[data-caw]')) { u.caw = !u.caw; u.more = false; return redraw(); }
+      if (t.closest('[data-wopen]')) { u.wopen = !u.wopen; u.more = false; if (!u.wopen) { u.wto = ''; u.wtext = ''; } return redraw(); }
+      if ((el = t.closest('[data-action]'))) { u.act = u.act === el.dataset.action ? '' : el.dataset.action; u.cards = []; u.more = false; return redraw(); }
+      if ((el = t.closest('#tsend'))) {
         if (!turnValid(pd, u)) return;
         const limit = (f.say || {}).words || 80;
-        const action = { targets: u.targets, role: u.role, number: f.number ? u.number : null, cards: u.cards, say: u.say.trim().split(/\s+/).slice(0, limit).join(' '), caw: u.caw, note: '',
+        const say = u.say.trim().split(/\s+/).slice(0, limit).join(' ');
+        const action = { targets: u.targets, role: u.role, number: f.number ? u.number : null, cards: u.cards, say, caw: u.caw, note: '',
           whisper: u.wto && u.wtext.trim() ? { to: [u.wto], text: u.wtext.trim() } : null,
           special: u.act ? { action: u.act, player: u.aplayer || null, animal: u.aanimal || null, guesses: Object.entries(u.guesses).map(([player, animal]) => ({ player, animal })) } : null };
-        t.closest('#tsend').disabled = true;
-        try {
-          await ctl(`/api/play/${encodeURIComponent(P.id)}/answer`, { body: { id: pd.id, action } });
-          P.sent = pd.id; P.turnKey = '';
-          drawTurn(P.data);
-        } catch (err) { toast(err.message, true); P.turnKey = ''; drawTurn(P.data, true); }
+        el.disabled = true;
+        P.sent = pd.id; P.turnKey = '';
+        if (pd.kind === 'day' && say) {              // show your message at once; the real one replaces it
+          P.ghost = say;
+          $('#ftyping').insertAdjacentHTML('beforebegin', `<div class="in f-msg mine ghost" id="fghost"><div class="f-col"><div class="bubble">${esc(say)}</div></div></div>`);
+        }
+        drawTurn(P.data); toBottom(true);
+        try { await ctl(`/api/play/${encodeURIComponent(P.id)}/answer`, { body: { id: pd.id, action } }); }
+        catch (err) { toast(err.message, true); P.sent = null; P.turnKey = ''; P.ghost = ''; const g = $('#fghost'); if (g) g.remove(); drawTurn(P.data, true); }
       }
     });
     box.addEventListener('input', (e) => {
       const u = P.u, t = e.target; if (!u) return;
-      if (t.id === 'tsay') { u.say = t.value; const pd = P.data.pending, limit = ((pd.fields.say || {}).words) || 80, n = words(u.say), c = $('#tcount'); c.textContent = `${n}/${limit}`; c.classList.toggle('over', n > limit); refreshSend(); }
-      else if (t.id === 'twtext') { u.wtext = t.value; refreshSend(); }
+      if (t.id === 'tsay') {
+        u.say = t.value; grow(t);
+        const pd = P.data.pending, limit = ((pd.fields.say || {}).words) || 80, n = words(u.say), c = $('#tcount');
+        c.textContent = `${n}/${limit}`; c.hidden = n <= limit * .7; c.classList.toggle('over', n > limit);
+        refreshSend();
+      } else if (t.id === 'twtext') { u.wtext = t.value; refreshSend(); }
     });
     box.addEventListener('change', (e) => {
       const u = P.u, t = e.target; if (!u) return;
@@ -1359,6 +1410,7 @@
       refreshSend();
     });
     box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'tsay') { e.preventDefault(); const b = $('#tsend'); if (b && !b.disabled) b.click(); } });
+    box.addEventListener('focusin', (e) => { if (e.target.id === 'tsay') setTimeout(() => toBottom(false), 250); });
   }
 
   boot();

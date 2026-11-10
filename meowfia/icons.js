@@ -350,6 +350,7 @@
     scores: L('M7 4 h10 v5 a5 5 0 0 1 -10 0 Z M7 6 H4 a3 3 0 0 0 3 4 M17 6 h3 a3 3 0 0 1 -3 4 M12 14 v4 M8 20 h8'),
     // actions
     close: L('M6 6 l12 12 M18 6 l-12 12'),
+    send: L('M12 19 V5 M5.500 11.500 L12 5 l6.500 6.500'),
     back: L('M14 5 l-7 7 l7 7'),
     next: L('M10 5 l7 7 l-7 7'),
     down: L('M5 9 l7 7 l7 -7'),
