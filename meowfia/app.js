@@ -300,7 +300,7 @@
     h += `<section class="block"><h3>Setup</h3><dl class="facts">
       <dt>Version</dt><dd><a href="#/rules/${encodeURIComponent(g.variant)}">${esc(g.variant)}</a></dd>
       ${ov.length ? `<dt>Changes</dt><dd><ul class="plain">${ov.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd>` : ''}
-      <dt>Players</dt><dd>${g.players.map((n) => `<span class="pname">${dot(g, n)}${esc(n)}${(g.seat_models || {})[n] ? ` <small>${esc(model(g.seat_models[n]))}</small>` : ''}</span>`).join('')}</dd>
+      <dt>Players</dt><dd>${g.players.map((n) => `<span class="pname">${dot(g, n)}${esc(n)}${g.human === n ? ' <small>played by a person</small>' : (g.seat_models || {})[n] ? ` <small>${esc(model(g.seat_models[n]))}</small>` : ''}</span>`).join('')}</dd>
       <dt>Played by</dt><dd>${esc(model(g.model))}${g.effort ? `, ${esc(g.effort)} effort` : ''}${g.review_model && g.review ? `; reviewed by ${esc(model(g.review_model))}` : ''}</dd>
       <dt>Seed</dt><dd>${g.seed}</dd>
       <dt>Length</dt><dd>${g.minutes ? g.minutes + ' minutes' : 'unknown'}${g.usage ? `, ${g.usage.calls} turns` : ''}</dd>
