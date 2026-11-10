@@ -132,6 +132,8 @@
     if (key === 'game.seat_roles') return Object.entries(v).map(([n, r]) => `${n} is the ${r}`).join(', ');
     if (key === 'game.seat_sides') return Object.entries(v).map(([n, r]) => `${n} is ${r}`).join(', ');
     if (key === 'game.seat_rounds') return v === 'first' ? 'Fixed seats apply to round 1 only' : 'Fixed seats apply every round';
+    if (key.startsWith('text.')) return `${key.slice(5)} is reworded`;
+    if (key === 'rules.notes') return `${plural(v.length, 'clarification')} added to the rules`;
     const m = settingMeta(key);
     return m ? `${m.label}: ${showValue(m, v)}` : `${key} = ${showValue(null, v)}`;
   }
@@ -486,6 +488,7 @@
         const showRes = s && !v.again;
         let verdict;
         if (v.again) verdict = '<div class="verdict none"><div><b>The Bottlebrush took the most eggs.</b><span>Nobody is eggsecuted. The round goes back to night.</span></div></div>';
+        else if (v.nobody) verdict = s ? `<div class="verdict ${v.team === 'Meowfia' ? 'cat' : 'farm'}"><div><b>"Nobody" took the most eggs.</b><span>${v.team === 'Meowfia' ? 'But there were Meowfia at the table, so Meowfia wins the round.' : 'And there were no Meowfia: everyone who threw at Nobody banks their cards.'}</span></div></div>` : `<div class="verdict none"><div><b>"Nobody" took the most eggs.</b><span>No one is eggsecuted. Were there really no cats?</span></div><button class="btn primary" data-reveal="${R}">Reveal round ${R}</button></div>`;
         else if (!v.eliminated.length) verdict = '<div class="verdict none"><div><b>Nobody was eggsecuted.</b></div></div>';
         else if (!s) verdict = `<div class="verdict none"><div><b>${esc(list(v.eliminated))} ${v.eliminated.length > 1 ? 'are' : 'is'} eggsecuted.</b><span>A cat, or not? Make your guess, then reveal.</span></div><button class="btn primary" data-reveal="${R}">Reveal round ${R}</button></div>`;
         else verdict = v.eliminated.map((e) => { const a = v.revealed[e]; const none = Object.values(truth).every((x) => x === 'Farm'); return `<div class="verdict ${a === 'Meowfia' ? 'farm' : 'cat'}">${av(g, e, endPeople[e], 'l')}<div><b>${esc(e)} was ${a === 'Meowfia' ? 'a cat' : 'Farm'}.</b><span>${a === 'Meowfia' ? 'Farm wins the round.' : none ? 'There were no cats at all, so everyone loses their thrown eggs.' : 'Meowfia wins the round.'}${v.goose ? ' The Goose is in the pool, so winners and losers swap.' : ''}${v.corpse ? ' The Corpse Flower kept this hidden from the table.' : ''}</span></div></div>`; }).join('');
@@ -503,6 +506,7 @@
     if (s) {
       const end = rec.end;
       add('scores', 'Scores', 'scores', 'After round ' + R, `${standings(g, rec.scores, rec.gained, end)}
+        ${rec.trimmed ? `<p class="fine">Nest limit: ${esc(Object.entries(rec.trimmed).map(([n, c]) => `${n} discarded ${c.length}`).join(', '))}.</p>` : ''}
         ${g.players.some((n) => end[n].role !== start[n].role || end[n].alignment !== start[n].alignment) ? `<ul class="changes">${g.players.filter((n) => end[n].role !== start[n].role || end[n].alignment !== start[n].alignment).map((n) => `<li>${dot(g, n)}<b>${esc(n)}</b> started as ${esc(start[n].alignment)} ${esc(start[n].role)} and ended as ${esc(end[n].alignment)} ${esc(end[n].role)}.</li>`).join('')}</ul>` : ''}`);
     }
     const idx = g.rounds.indexOf(rec);
@@ -666,7 +670,7 @@
     page(`<header class="page-head"><h1>Rules</h1><p>The rules exactly as the players read them, and the settings behind them.</p></header>
       <div class="chiprow" id="vpick">${D.variants.map((x) => `<a class="fchip${x.name === v.name ? ' on' : ''}" href="#/rules/${encodeURIComponent(x.name)}">${esc(x.name)}</a>`).join('')}</div>
       <section class="block lead-block"><h2>${esc(v.name)}</h2><p class="muted">${esc(v.description || '')}${base ? ` Based on ${esc(base.name)}.` : ''}</p>
-        ${v.changes && v.changes.length ? `<ul class="plain diff">${v.changes.map((c) => { const m = settingMeta(c.key); return `<li><b>${esc(m ? m.label : c.key)}</b> ${esc(showValue(m, c.to))} <small>was ${esc(c.from === undefined || c.from === null ? 'unset' : showValue(m, c.from))}</small></li>`; }).join('')}</ul>` : ''}
+        ${v.changes && v.changes.length ? `<ul class="plain diff">${v.changes.map((c) => { const m = settingMeta(c.key); if (c.key.startsWith('text.')) return `<li><b>${esc(c.key.slice(5))}</b> ${esc(c.to)}</li>`; if (c.key === 'rules.notes') return c.to.map((x) => `<li><b>Clarified</b> ${esc(x)}</li>`).join(''); if (c.key.startsWith('deck.')) { const gone = (c.from || []).filter((x) => !c.to.includes(x)), added = c.to.filter((x) => !(c.from || []).includes(x)); return `<li><b>${c.key === 'deck.roles' ? 'Animals' : 'Flowers'}</b> ${esc([gone.length ? 'without ' + list(gone) : '', added.length ? 'with ' + list(added) : ''].filter(Boolean).join('; '))}</li>`; } return `<li><b>${esc(m ? m.label : c.key)}</b> ${esc(showValue(m, c.to))} <small>was ${esc(c.from === undefined || c.from === null ? 'unset' : showValue(m, c.from))}</small></li>`; }).join('')}</ul>` : ''}
         <a class="btn small" href="#/run?variant=${encodeURIComponent(v.name)}">${ui('run', 14)}Play this version</a></section>
       <div class="rules-layout"><article class="rules-text">${rulesHTML(v.rules)}</article>
       <aside class="settings">${D.meta.groups.map((grp) => `<section class="block"><h3>${esc(grp.label)}</h3><dl class="facts tight">${D.meta.settings.filter((s) => s.group === grp.id).map((s) => `<dt>${esc(s.label)}</dt><dd class="${changed.has(s.key) ? 'changed' : ''}">${esc(showValue(s, getPath(v.settings, s.key)))}</dd>`).join('')}</dl></section>`).join('')}
@@ -1214,7 +1218,7 @@
     const head = pd.kind === 'vote' ? 'Who do you throw at?' : max === 2 ? (labels ? `${labels[0]} Then: ${labels[1].toLowerCase()}` : 'Choose two players, in order') : 'Who do you visit?';
     return `<div class="t-field"><span class="label">${esc(head)}</span><div class="t-players">${f.options.map((n) => {
       const i = u.targets.indexOf(n), p = s.players.find((x) => x.name === n) || {};
-      const face = n === 'Bottlebrush' ? `<span class="av tok">${icon('Bottlebrush')}</span>` : `<span class="av tok">${eggToken(P.data.players.indexOf(n))}</span>`;
+      const face = n === 'Bottlebrush' ? `<span class="av tok">${icon('Bottlebrush')}</span>` : n === 'Nobody' ? `<span class="av tok">${MeowIcons.svg('?', 'unknown')}</span>` : `<span class="av tok">${eggToken(P.data.players.indexOf(n))}</span>`;
       return `<button type="button" class="t-player${i >= 0 ? ' on' : ''}${p.dead ? ' dead' : ''}" data-target="${esc(n)}" aria-pressed="${i >= 0}">${face}<b>${esc(n)}</b>${max > 1 && i >= 0 ? `<i class="ord">${i + 1}</i>` : ''}${p.dead ? '<small>dead</small>' : ''}</button>`;
     }).join('')}</div></div>`;
   }
