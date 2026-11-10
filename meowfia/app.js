@@ -163,9 +163,10 @@
     const parts = path.split('/').map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
     let view = parts[0] || 'games';
     if (view === 'new') view = 'run';
-    const section = { game: 'games', sim: 'sims' }[view] || view;
+    const section = { game: 'games', sim: 'sims', play: 'run' }[view] || view;
     $$('[data-nav]').forEach((a) => { const on = a.dataset.nav === section; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     stopPolling(); closeSheet();
+    if (view !== 'play') leavePlay();
     const key = view + '/' + (parts[1] || '');
     if (key !== lastView) window.scrollTo(0, 0);
     lastView = key;
@@ -177,6 +178,7 @@
     if (view === 'sims') return viewSims();
     if (view === 'sim') return viewSim(parts[1]);
     if (view === 'run') return viewRun(new URLSearchParams(query));
+    if (view === 'play') return viewPlay(parts[1]);
     app.innerHTML = '<div class="page"><div class="empty"><b>Page not found.</b><a class="btn" href="#/">Back to the games</a></div></div>';
   }
   const page = (html, cls = '') => { app.innerHTML = `<div class="page ${cls}">${html}</div>`; };
@@ -721,7 +723,7 @@
   function stopPolling() { if (poll) { clearInterval(poll); poll = null; } }
   const MODELS = ['haiku', 'sonnet', 'opus', 'fable'];
   const MODEL_NOTE = { haiku: 'Fast and light on usage. Misreads rules more often.', sonnet: 'Plays well. The usual choice.', opus: 'Sharper deduction. Heavy on usage.', fable: 'The strongest player. Heaviest on usage.' };
-  const blank = () => ({ kind: 'game', variant: '', players: null, rounds: null, seed: '', games: 500, model: 'sonnet', effort: '', review: 'opus', probes: true, seats: {}, seatRounds: 'all', roles: null, flowers: null, startPool: [], reveals: [], rules: {}, raw: '' });
+  const blank = () => ({ kind: 'game', variant: '', players: null, rounds: null, seed: '', games: 500, model: 'sonnet', effort: '', review: 'opus', probes: true, human: '', opponents: 'claude', seats: {}, seatRounds: 'all', roles: null, flowers: null, startPool: [], reveals: [], rules: {}, raw: '' });
   let B = Object.assign(blank(), store.get('builder', {}));
   const R = { status: null, state: 'checking', cardTab: 'roles', q: '' };
   const saveB = () => store.set('builder', B);
@@ -757,12 +759,14 @@
   function payload() {
     const seat_models = {};
     for (const n of seatNames()) { const m = (B.seats[n] || {}).model; if (m && m !== B.model) seat_models[n] = m; }
-    return { type: B.kind, variant: variantOf().name, players: nPlayers(), rounds: nRounds(), seed: B.seed === '' ? null : +B.seed, model: B.model, effort: B.effort || null, review_model: B.review, probes: B.probes, games: B.games, seat_models, set: overridesOf() };
+    const human = B.kind === 'game' && seatNames().includes(B.human) ? B.human : null;
+    return { type: B.kind, variant: variantOf().name, players: nPlayers(), rounds: nRounds(), seed: B.seed === '' ? null : +B.seed, human, opponents: human && B.opponents === 'random' ? 'random' : 'claude', model: B.model, effort: B.effort || null, review_model: B.review, probes: B.probes, games: B.games, seat_models, set: overridesOf() };
   }
   function command() {
     const p = payload(), q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
     let c = `python3 -m meowsim ${p.type === 'sim' ? 'sim --games ' + p.games : 'play --model ' + p.model} --variant ${q(p.variant)} --players ${p.players} --rounds ${p.rounds}`;
     if (p.seed !== null) c += ` --seed ${p.seed}`;
+    if (p.human) c += ` --human ${p.human}` + (p.opponents === 'random' ? ' --seats random' : '');
     if (p.type === 'game') { c += ` --review-model ${p.review_model}`; if (p.effort) c += ` --effort ${p.effort}`; if (!p.probes) c += ' --no-probes'; for (const [n, m] of Object.entries(p.seat_models)) c += ` --seat-model ${n}=${m}`; }
     for (const o of p.set) c += ` --set ${q(o)}`;
     return c;
@@ -810,7 +814,7 @@
   }
   function runLine(r) {
     const what = r.type === 'sim' ? `${(r.games || 0).toLocaleString()} simulated games` : 'Real game';
-    return `<b>${what}</b><span>${esc(r.variant)} · ${r.players} players${r.type === 'game' ? ' · ' + esc(r.seat_models ? 'mixed models' : model(r.model)) : ''}${r.changes ? ' · ' + plural(r.changes, 'change') : ''}</span>`;
+    return `<b>${what}</b><span>${esc(r.variant)} · ${r.players} players${r.type === 'game' ? ' · ' + esc(r.practice ? 'practice bots' : r.seat_models ? 'mixed models' : model(r.model)) : ''}${r.human ? ' · you play ' + esc(r.human) : ''}${r.changes ? ' · ' + plural(r.changes, 'change') : ''}</span>`;
   }
   function showMonitor() {
     const box = $('#monitor'), st = R.status; if (!box || !st) return;
@@ -822,7 +826,7 @@
       ${r.state === 'done' ? `<a class="btn small" href="#/${r.type === 'sim' ? 'sim' : 'game'}/${encodeURIComponent(r.id)}">Open</a>` : ''}</li>`;
     const tailKey = run && run.tail ? run.tail.length + '|' + run.tail[run.tail.length - 1] : '';
     const liveEl = $('#live'), stick = !liveEl || liveEl.scrollTop + liveEl.clientHeight >= liveEl.scrollHeight - 30;
-    box.innerHTML = `${run ? `<section class="live-run"><div class="live-head"><span class="pulse"></span><div class="qitem-text">${runLine(run)}</div><button type="button" class="btn small danger" data-stop="${esc(run.id)}">${ui('stop', 14)}Stop</button></div>
+    box.innerHTML = `${run ? `<section class="live-run"><div class="live-head"><span class="pulse"></span><div class="qitem-text">${runLine(run)}</div>${run.human ? `<a class="btn small primary" href="#/play/${encodeURIComponent(run.id)}">Play</a>` : ''}<button type="button" class="btn small danger" data-stop="${esc(run.id)}">${ui('stop', 14)}Stop</button></div>
         <div class="progress" role="progressbar" aria-valuenow="${Math.round((run.progress || 0) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round((run.progress || 0) * 100)}%"></i></div>
         <div class="live-meta"><span>${esc(run.phase || 'Starting')}</span><span>${esc(run.elapsed || '')}${run.calls ? ' · ' + run.calls + ' turns' : ''}</span></div>
         ${run.tail && run.tail.length ? `<div class="live" id="live" data-key="${esc(tailKey)}">${run.tail.map((l) => `<p>${esc(l)}</p>`).join('')}</div>` : ''}</section>` : ''}
@@ -872,7 +876,8 @@
     const anyFixed = names.some((n) => (B.seats[n] || {}).role || (B.seats[n] || {}).side);
     const nSet = names.filter((n) => { const x = B.seats[n] || {}; return x.role || x.side || (B.kind === 'game' && x.model); }).length;
     box.innerHTML = `${secHead(3, 'The players', B.kind === 'game' ? 'Who plays, and anything you want to fix about a seat.' : 'Fix a seat\'s animal or side to test a matchup.')}
-      ${B.kind === 'game' ? `<div class="frow"><div class="flabel"><b>Model for the table</b><span>${MODEL_NOTE[B.model]}</span></div><div class="seg">${MODELS.map((m) => `<button type="button" class="${B.model === m ? 'on' : ''}" data-set="model" data-value="${m}">${MODEL[m]}</button>`).join('')}</div></div>
+      ${B.kind === 'game' ? `<div class="frow"><div class="flabel"><b>Your seat</b><span>${B.human ? `You play ${esc(B.human)} from this device. The others wait for you on your turn.` : 'Watch the game, or take a seat and play it yourself.'}</span></div><select data-bind="human" class="auto"><option value="">Just watch</option>${names.map((n) => `<option value="${n}" ${B.human === n ? 'selected' : ''}>Play as ${n}</option>`).join('')}</select></div>${B.human ? `<div class="frow"><div class="flabel"><b>Your opponents</b><span>${B.opponents === 'random' ? 'Random bots answer at once and cost nothing. Good for learning the screens, not for a real game.' : 'Claude plays the other seats.'}</span></div><div class="seg">${[['claude', 'Claude'], ['random', 'Practice bots']].map(([k, l]) => `<button type="button" class="${B.opponents === k ? 'on' : ''}" data-set="opponents" data-value="${k}">${l}</button>`).join('')}</div></div>` : ''}` : ''}
+      ${B.kind === 'game' && !(B.human && B.opponents === 'random') ? `<div class="frow"><div class="flabel"><b>Model for the table</b><span>${MODEL_NOTE[B.model]}</span></div><div class="seg">${MODELS.map((m) => `<button type="button" class="${B.model === m ? 'on' : ''}" data-set="model" data-value="${m}">${MODEL[m]}</button>`).join('')}</div></div>
       <div class="fgrid">
         <label class="fcell"><b>Thinking effort</b><select data-bind="effort">${[['', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']].map(([k, l]) => `<option value="${k}" ${B.effort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label class="fcell"><b>Review written by</b><select data-bind="review">${[...MODELS, 'none'].map((m) => `<option value="${m}" ${B.review === m ? 'selected' : ''}>${m === 'none' ? 'Nobody (skip)' : MODEL[m]}</option>`).join('')}</select></label>
@@ -921,7 +926,8 @@
     lines.push(['Type', p.type === 'sim' ? `${p.games.toLocaleString()} simulated games` : 'Real game']);
     lines.push(['Version', p.variant]);
     lines.push(['Table', `${p.players} players, ${plural(p.rounds, 'round')}`]);
-    if (p.type === 'game') { const mixed = Object.keys(p.seat_models).length; lines.push(['Played by', model(p.model) + (mixed ? ` and ${plural(mixed, 'other seat')}` : '')]); }
+    if (p.human) lines.push(['You play', p.human]);
+    if (p.type === 'game') { const mixed = Object.keys(p.seat_models).length; lines.push([p.human ? 'Against' : 'Played by', p.opponents === 'random' ? 'Practice bots' : model(p.model) + (mixed ? ` and ${plural(mixed, 'other seat')}` : '')]); }
     lines.push(['Seed', p.seed === null ? 'Random' : p.seed]);
     return lines;
   }
@@ -929,7 +935,7 @@
     const side = $('#summary'), bar = $('#startbar'); if (!side) return;
     const p = payload(), ch = p.set.map(describe).filter(Boolean);
     let action, hint = '';
-    if (R.state === 'ok') action = `<button type="button" class="btn primary big" data-act="start">${ui('run', 16)}Start the run</button>`;
+    if (R.state === 'ok') action = `<button type="button" class="btn primary big" data-act="start">${ui('run', 16)}${p.human ? 'Take your seat' : 'Start the run'}</button>`;
     else if (R.state === 'handover') { action = `<a class="btn primary big" id="handover" href="#">${ui('link', 16)}Continue on your PC</a>`; hint = 'Opens the PC\'s copy of this page with this setup. Needs Tailscale.'; }
     else if (R.state === 'checking') action = '<button type="button" class="btn primary big" disabled>Looking for the PC…</button>';
     else action = `<button type="button" class="btn primary big" disabled>${R.state === 'down' ? 'The PC is unreachable' : 'Runs are not set up here'}</button>`;
@@ -1020,7 +1026,7 @@
     });
     root.addEventListener('change', (e) => {
       const t = e.target;
-      if (t.dataset.bind) { B[t.dataset.bind] = t.value; }
+      if (t.dataset.bind) { B[t.dataset.bind] = t.value; if (t.dataset.bind === 'human') drawPlayers(); }
       else if (t.dataset.seatModel) { const n = t.dataset.seatModel; B.seats[n] = { ...(B.seats[n] || {}), model: t.value }; }
       else if (t.dataset.rule) { const rk = t.dataset.rule; B.rules[rk] = t.value; if (B.rules[rk] === baseVal(rk)) delete B.rules[rk]; redrawRule(rk); }
       else return;
@@ -1043,7 +1049,8 @@
   async function start(btn) {
     $$('[data-act="start"]').forEach((b) => { b.disabled = true; });
     try {
-      await ctl('/api/run', { body: payload() });
+      const p = payload(), res = await ctl('/api/run', { body: p });
+      if (p.human) { location.hash = '#/play/' + encodeURIComponent(res.id); return; }
       toast(B.kind === 'sim' ? 'Simulation queued.' : 'Game queued. It starts in a moment.');
       await refresh();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1067,6 +1074,287 @@
         saveB(); closeSheet(); drawAll(); toast(`Saved as ${res.name}.`);
       } catch (err) { toast(err.message, true); }
     };
+  }
+
+  /* ================= playing a seat ================= */
+  // The page holds one request open to the PC; it answers the moment anything changes, so there is no polling lag.
+  const P = { id: null, alive: false, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '' };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let nameRx = null;
+  function linkCards(html) {                     // card names in Storyteller text become tappable
+    if (!nameRx) nameRx = new RegExp('\\b(' + Object.keys(D.card).sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, '(?:\'|&#39;)')).join('|') + ')\\b', 'g');
+    return html.replace(nameRx, (m) => `<button type="button" class="tlink" data-card="${m}">${m}</button>`);
+  }
+  function tidy(text) {                          // card ids become values; the nest line goes (it is on screen)
+    return text.split('\n').map((l) => l.replace(/\s*Your nest \(\d+ cards?\): .*$/, '').replace(/\s*Your nest \(0 cards\): empty\.?/, ''))
+      .map((l) => l.replace(/\bW\d+ \(wild, 0\)/g, 'a Wild').replace(/\b([HDCS])\d+b? \((\d+)\)/g, (m, s, v) => v + SUIT[s]))
+      .filter((l) => l.trim()).join('\n');
+  }
+  const para = (text, link) => tidy(text).split('\n').map((l) => `<p>${link ? linkCards(esc(l)) : esc(l)}</p>`).join('');
+  function feedItem(x, me) {
+    const t = x.text;
+    if (x.k === 'header') return `<div class="f-head"><span>${esc(t.replace(/=/g, '').trim())}</span></div>`;
+    if (x.k === 'beat') return `<div class="f-beat">${esc(t.replace(/-/g, '').trim())}</div>`;
+    if (x.k === 'say') {
+      const anon = !t.startsWith(x.sp + ':'), who = anon ? 'Someone' : x.sp, mine = x.sp === me && !anon;
+      const body = t.slice(t.indexOf(':') + 1).trim();
+      return `<div class="f-msg${mine ? ' mine' : ''}">${mine ? '' : `<span class="av s tok">${anon ? '' : eggToken(P.data.players.indexOf(who))}</span>`}<div><div class="f-who">${mine ? 'You' : esc(who)}</div><div class="bubble">${esc(body)}</div></div></div>`;
+    }
+    if (x.k === 'whisper') {
+      const mine = x.sp === me, body = t.slice(t.indexOf(':') + 1).trim(), head = t.slice(0, t.indexOf(':'));
+      return `<div class="f-msg whisper${mine ? ' mine' : ''}">${mine ? '' : `<span class="av s tok">${eggToken(P.data.players.indexOf(x.sp))}</span>`}<div><div class="f-who">${esc(mine ? head.replace(x.sp + ' whispers', 'You whisper') : head.replace(' to ' + me, ' to you'))}</div><div class="bubble">${esc(body)}</div></div></div>`;
+    }
+    if (x.k === 'caw') return `<div class="f-sys caw">${esc(t)}</div>`;
+    if (x.k === 'death') return `<div class="f-sys death">${esc(t)}</div>`;
+    if (t.startsWith('Nest sizes:')) return '';
+    if (x.priv) return `<div class="f-priv"><div class="f-priv-top">${ui('eyeoff', 13)}Only you see this</div>${para(t, true)}</div>`;
+    return `<div class="f-story">${para(t, true)}</div>`;
+  }
+  const phaseOf = (items) => { for (let i = items.length - 1; i >= 0; i--) if (items[i].k === 'header') { const m = items[i].text.replace(/=/g, '').trim().split(':'); return cap((m[1] || 'setup').trim()); } return 'Setup'; };
+
+  async function viewPlay(id) {
+    if (!canCall()) { page(`<div class="empty"><b>Playing happens on your PC's copy of the site.</b><span>Open it from a device on your Tailscale network.</span>${D.config.control && D.config.control !== 'SELF' ? `<a class="btn primary" href="${esc(D.config.control)}/#/play/${encodeURIComponent(id)}">Open it there</a>` : ''}</div>`); return; }
+    document.body.classList.add('playing');
+    document.title = 'Playing · Meowfia Lab';
+    Object.assign(P, { id, alive: true, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '', items: [], phase: 'Setup' });
+    app.innerHTML = `<div class="play" id="play"><header class="play-top"><a class="icon-btn" href="#/run" aria-label="Leave the table">${ui('back', 20)}</a>
+        <div class="play-phase" id="pphase"><b>Meowfia</b><span>Connecting</span></div>
+        <button type="button" class="icon-btn" id="ppool" aria-label="Cards in the pool">${ui('pool', 20)}</button><button type="button" class="icon-btn" id="prules" aria-label="Rules">${ui('rules', 20)}</button></header>
+      <div class="play-body"><aside class="hud" id="hud"></aside>
+        <section class="play-main"><div class="feed" id="feed" aria-live="polite"><div class="loading">Taking your seat</div></div><div class="turn" id="turn"></div></section></div></div>`;
+    $('#prules').onclick = () => { const v = D.variants.find((x) => x.name === (P.data || {}).variant) || D.variants[0]; openSheet(`<h2>Rules</h2><div class="rules-text flat">${rulesHTML(v.rules)}</div>`, 'Rules'); };
+    $('#ppool').onclick = () => { const st = (P.data || {}).state || {}; openSheet(`<h2>In the pool</h2><p class="fine">Tap a card to read it.</p>${(st.flowers || []).length ? `<h4>Flowers this round</h4><div class="pills">${st.flowers.map((f) => cchip(f)).join('')}</div>` : ''}<h4>Animals</h4><div class="pills">${(st.pool || []).map((x) => cchip(x)).join('')}</div>`, 'In the pool'); };
+    wireTurn();
+    const mine = id;
+    const hold = !store.get('nowait', false);      // a test switch: ask once a second instead of holding the line
+    while (P.alive && P.id === mine) {
+      try {
+        const r = await ctl(`/api/play/${encodeURIComponent(id)}?since=${P.total}&token=${encodeURIComponent(P.token)}&wait=${hold ? 1 : 0}`, { timeout: 34000 });
+        if (!P.alive || P.id !== mine) break;
+        applyPlay(r);
+        if (!hold) await sleep(1000);
+        if (r.status !== 'running' && r.status !== 'queued') {      // nothing more will happen until it is resumed
+          await sleep(4000);
+        }
+      } catch (e) {
+        if (!P.alive || P.id !== mine) break;
+        if (!P.data) { $('#feed').innerHTML = `<div class="empty"><b>This game could not be opened.</b><span>${esc(e.message === 'unreachable' ? 'The PC is not reachable.' : e.message)}</span><a class="btn" href="#/run">Back</a></div>`; if (/no such|nobody/.test(e.message)) break; }
+        await sleep(1500);
+      }
+    }
+  }
+  function leavePlay() { P.alive = false; document.body.classList.remove('playing'); }
+
+  function applyPlay(r) {
+    const first = !P.data;
+    P.data = r; P.token = r.token;
+    const feed = $('#feed'); if (!feed) return;
+    const near = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 80;
+    if (first) feed.innerHTML = '';
+    if (r.items.length) {
+      P.items = P.items.concat(r.items);
+      feed.insertAdjacentHTML('beforeend', r.items.map((x) => feedItem(x, r.me)).join(''));
+      P.total = r.total;
+      P.phase = phaseOf(P.items);
+      if (first || near) feed.scrollTop = feed.scrollHeight;
+    }
+    const s = r.state || {};
+    $('#pphase').innerHTML = `<b>${s.round ? `Round ${s.round} of ${s.rounds}` : esc(r.variant)}</b><span>${esc(r.over ? 'Game over' : P.phase)}</span>`;
+    drawHud(r);
+    drawTurn(r);
+    if (first || near) feed.scrollTop = feed.scrollHeight;
+  }
+
+  function drawHud(r) {
+    const s = r.state; if (!s) return;
+    const key = JSON.stringify(s);
+    if (key === P.hud) return;
+    P.hud = key;
+    const me = s.me, cards = {}; for (const c of me.hand) cards[c.id] = c;
+    P.cards = cards;
+    const eggOf = (c) => { const wild = c.id[0] === 'W'; return `<span class="egg ${wild ? 'wild' : 'HD'.includes(c.id[0]) ? 'red' : 'black'}">${wild ? 'W' : c.value}<i>${wild ? '' : SUIT[c.id[0]]}</i></span>`; };
+    const asking = new Set(s.asking || []);
+    $('#hud').innerHTML = `<section class="hud-you ${sideClass(me.alignment)}">
+        <button type="button" class="hud-me" ${me.role ? `data-card="${esc(me.role)}"` : ''}><span class="av l ${sideClass(me.alignment)}">${me.role ? icon(me.role) : eggToken(r.players.indexOf(me.name))}</span>
+          <span class="hud-me-text"><small>You are ${esc(me.name)}</small><b>${me.role ? 'The ' + esc(me.role) : 'Waiting for the deal'}</b><span class="pills">${sidePill(me.alignment)}${me.dead ? pill('Dead', 'muted') : ''}${me.winks ? pill(plural(me.winks, 'Wink'), 'yolk') : ''}</span></span></button>
+        <div class="hud-nest"><span class="label">Your nest · ${me.hand.length}</span><div class="eggs">${me.hand.map(eggOf).join('') || '<span class="muted">Empty</span>'}</div></div>
+        <div class="hud-bank">${ui('scores', 14)}<span><b>${me.banked + me.hand.length}</b> points so far</span><small>${me.banked} banked, ${me.hand.length} kept</small></div></section>
+      <section class="hud-table"><span class="label">The table</span><div class="hud-players">${s.players.map((p) => `<div class="hud-p${p.dead ? ' dead' : ''}${p.name === me.name ? ' me' : ''}"><span class="av tok">${eggToken(r.players.indexOf(p.name))}${asking.has(p.name) ? '<i class="think"></i>' : ''}</span><b>${p.name === me.name ? 'You' : esc(p.name)}</b><small>${p.dead ? 'dead' : p.nest === null ? 'hidden' : plural(p.nest, 'egg')}${p.name === s.dealer ? '<em> · dealer</em>' : ''}</small></div>`).join('')}</div></section>
+      <section class="hud-pool"><span class="label">In the pool</span><div class="hud-chips">${(s.flowers || []).map((f) => cchip(f)).join('')}${(s.pool || []).map((a) => cchip(a)).join('')}</div></section>`;
+  }
+
+  /* ----- your turn ----- */
+  const blankTurn = () => ({ targets: [], role: null, number: null, cards: [], say: '', caw: false, wto: '', wtext: '', act: '', aplayer: '', aanimal: '', guesses: {} });
+  const TARGET_LABELS = { Gecko: ['Copy whose animal?', 'Use it on whom?'], Copycat: ['Copy whose animal?', 'Use it on whom?'], 'Rag Doll': ['Who do you visit?', 'Where are they sent instead?'], 'Cat Burgler': ['Who do you steal from?', 'Who gets the eggs?'] };
+  const ACTION = { wink: ['Wink at someone', 'They die at once. Nobody is told it was you.'], bond: ['Offer a handshake', 'Golden Wattle: bond with a player.'], touch: ['Touch someone', 'Stinging Bush: they die.'], sunflower: ['Use the Sunflower', 'Spend an egg to learn if a player is a certain animal.'], challenge: ['Challenge', 'Guess every animal. Right: you win alone. Wrong: you die.'], double_down: ['Double down', 'Crimson Kunzea: double your score this round.'] };
+  function words(s) { return s.trim() ? s.trim().split(/\s+/).length : 0; }
+  function turnValid(pd, u) {
+    const f = pd.fields;
+    if (f.targets && (u.targets.length < (f.targets.min ?? 1) || u.targets.length > (f.targets.max ?? 1))) return false;
+    if (f.role && f.role.required !== false && f.role.options.length && !u.role) return false;
+    if (f.cards && pd.kind !== 'day' && (u.cards.length < f.cards.min || u.cards.length > f.cards.max)) return false;
+    if (pd.kind === 'day' && u.act) {
+      if (['wink', 'bond', 'touch', 'sunflower'].includes(u.act) && !u.aplayer) return false;
+      if (u.act === 'sunflower' && (!u.aanimal || u.cards.length !== 1)) return false;
+      if (u.act === 'challenge' && f.special.players.some((p) => !u.guesses[p])) return false;
+    }
+    return true;
+  }
+  function submitLabel(pd, u) {
+    if (pd.kind === 'night') return 'Confirm';
+    if (pd.kind === 'discard') return `Discard ${plural(u.cards.length, 'card')}`;
+    if (pd.kind === 'extend') return u.cards.length ? 'Pay one egg' : 'Don\'t pay';
+    if (pd.kind === 'vote') { const n = pd.fields.cards ? u.cards.length : u.number; return u.targets[0] ? `Throw ${plural(n || 0, 'egg')} at ${u.targets[0]}` : 'Choose who to egg'; }
+    if (u.act) return ACTION[u.act][0];
+    if (u.say.trim() || u.wtext.trim()) return 'Send';
+    return u.caw ? 'Call CAW CAW' : 'Stay quiet';
+  }
+  function playerPick(pd, u, s) {
+    const f = pd.fields.targets, max = f.max ?? 1, labels = TARGET_LABELS[s.me.role];
+    const head = pd.kind === 'vote' ? 'Who do you throw at?' : max === 2 ? (labels ? `${labels[0]} Then: ${labels[1].toLowerCase()}` : 'Choose two players, in order') : 'Who do you visit?';
+    return `<div class="t-field"><span class="label">${esc(head)}</span><div class="t-players">${f.options.map((n) => {
+      const i = u.targets.indexOf(n), p = s.players.find((x) => x.name === n) || {};
+      const face = n === 'Bottlebrush' ? `<span class="av tok">${icon('Bottlebrush')}</span>` : `<span class="av tok">${eggToken(P.data.players.indexOf(n))}</span>`;
+      return `<button type="button" class="t-player${i >= 0 ? ' on' : ''}${p.dead ? ' dead' : ''}" data-target="${esc(n)}" aria-pressed="${i >= 0}">${face}<b>${esc(n)}</b>${max > 1 && i >= 0 ? `<i class="ord">${i + 1}</i>` : ''}${p.dead ? '<small>dead</small>' : ''}</button>`;
+    }).join('')}</div></div>`;
+  }
+  function cardPick(pd, u, label) {
+    const f = pd.fields.cards, sum = u.cards.reduce((a, id) => a + ((P.cards[id] || {}).value || 0), 0);
+    return `<div class="t-field"><span class="label">${esc(label)}${u.cards.length ? ` · ${u.cards.length} chosen, worth ${sum}` : ''}</span><div class="t-cards">${[...f.options].sort((x, y) => (((P.cards[x] || {}).value || 0) - ((P.cards[y] || {}).value || 0)) || x.localeCompare(y)).map((id) => { const c = P.cards[id] || { id, value: '?' }; const wild = id[0] === 'W'; return `<button type="button" class="egg big ${wild ? 'wild' : 'HD'.includes(id[0]) ? 'red' : 'black'}${u.cards.includes(id) ? ' on' : ''}" data-egg="${esc(id)}" aria-pressed="${u.cards.includes(id)}">${wild ? 'W' : c.value}<i>${wild ? '' : SUIT[id[0]]}</i></button>`; }).join('')}</div></div>`;
+  }
+  const animalSelect = (attr, options, value, none) => `<select ${attr}><option value="">${esc(none)}</option>${options.map((a) => `<option ${a === value ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select>`;
+  function turnBody(pd, u, s, r) {
+    const f = pd.fields, me = s.me, role = D.card[me.role];
+    let h = '';
+    if (pd.kind === 'night') {
+      h += `<div class="t-head"><b>Night. You are the ${esc(me.role)}.</b><span>${esc(role ? role.text : '')}</span></div>`;
+      if (f.targets) h += playerPick(pd, u, s);
+      if (f.role && f.role.options.length) h += `<div class="t-field"><span class="label">${f.role.required === false ? 'Name an animal (only if the copied animal needs one)' : 'Name an animal'}</span><div class="t-roles">${f.role.options.map((a) => `<button type="button" class="cchip ${typeOf(a)}${u.role === a ? ' on' : ''}" data-hold data-card="${esc(a)}" data-role="${esc(a)}"><span class="cchip-art">${icon(a)}</span><span>${esc(a)}</span></button>`).join('')}</div></div>`;
+      if (f.number) h += `<div class="t-field row"><span class="label">How many stolen eggs to pass on</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
+    } else if (pd.kind === 'discard') {
+      h += `<div class="t-head"><b>You lost ${plural(f.cards.min, 'egg')} in the night.</b><span>Choose which ${f.cards.min === 1 ? 'card' : 'cards'} to discard.</span></div>${cardPick(pd, u, 'Your nest')}`;
+    } else if (pd.kind === 'extend') {
+      h += `<div class="t-head"><b>The day is about to end.</b><span>Mulberry: anyone may pay one egg for one more turn of talk.</span></div>${cardPick(pd, u, 'Pay with')}`;
+    } else if (pd.kind === 'vote') {
+      h += `<div class="t-head"><b>Eggsecution.</b><span>Throw eggs at who you think is Meowfia${me.alignment === 'Meowfia' ? ' (you are Meowfia: get a Farm player out)' : ''}. Thrown cards bank at full value if your side wins the round; kept cards are worth 1.${me.dead ? ' You are dead: your eggs score but are not votes.' : ''}</span></div>${playerPick(pd, u, s)}`;
+      h += f.cards ? cardPick(pd, u, 'Which eggs') : `<div class="t-field row"><span class="label">How many eggs (the Poppy picks which)</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
+    } else {
+      const limit = (f.say || {}).words || 80, n = words(u.say);
+      const noise = /Banksia/.test(pd.prompt);
+      h += `<div class="t-say"><textarea id="tsay" rows="2" placeholder="${noise ? 'Banksia: only bird or cat noises aloud' : 'Say something to the table'}" aria-label="Say something">${esc(u.say)}</textarea><span class="t-count${n > limit ? ' over' : ''}" id="tcount">${n}/${limit}</span></div>`;
+      const acts = (f.special || {}).actions || [];
+      h += `<div class="t-tools"><button type="button" class="fchip${u.caw ? ' on' : ''}" data-caw aria-pressed="${u.caw}">CAW CAW</button>
+        ${f.whisper ? `<button type="button" class="fchip${u.wopen ? ' on' : ''}" data-wopen>Whisper</button>` : ''}
+        ${acts.map((a) => `<button type="button" class="fchip${u.act === a ? ' on' : ''}" data-action="${a}">${esc(ACTION[a][0])}</button>`).join('')}</div>`;
+      if (u.caw) h += `<p class="t-note">CAW CAW asks to end the talk and vote. It takes ${r.day.caw_caw_needed} players.</p>`;
+      if (f.whisper && u.wopen) h += `<div class="t-extra"><select data-wto><option value="">Whisper to…</option>${f.whisper.options.map((n2) => `<option ${u.wto === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select><input type="text" id="twtext" placeholder="Only they will hear this" value="${esc(u.wtext)}" autocomplete="off"></div>`;
+      if (u.act) {
+        const sp = f.special;
+        h += `<div class="t-extra col"><p class="t-note">${esc(ACTION[u.act][1])}</p>`;
+        if (['wink', 'bond', 'touch', 'sunflower'].includes(u.act)) h += `<select data-aplayer><option value="">Choose a player…</option>${sp.players.map((n2) => `<option ${u.aplayer === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select>`;
+        if (u.act === 'sunflower') h += animalSelect('data-aanimal', s.pool, u.aanimal, 'Are they the…') + cardPick(pd, u, 'Egg to spend (one)');
+        if (u.act === 'challenge') h += `<div class="t-guess">${sp.players.map((n2) => `<label><span>${esc(n2)}</span>${animalSelect(`data-guess="${esc(n2)}"`, s.pool, u.guesses[n2], 'is the…')}</label>`).join('')}</div>${f.cards ? cardPick(pd, u, 'Your bet') : ''}`;
+        h += '</div>';
+      }
+    }
+    return h;
+  }
+  function drawTurn(r, force) {
+    const box = $('#turn'); if (!box) return;
+    const s = r.state, pd = r.pending;
+    let key, html;
+    if (pd && s && P.sent !== pd.id) {
+      if (P.pendingId !== pd.id) {
+        P.pendingId = pd.id; P.u = blankTurn();
+        if (pd.fields.number) P.u.number = pd.fields.number.min;
+        if (navigator.vibrate) navigator.vibrate(25);
+        force = true;
+      }
+      key = 'turn:' + pd.id;
+      if (!force && key === P.turnKey) return;
+      html = `<div class="turn-in yours"><div class="turn-fields">${turnBody(pd, P.u, s, r)}</div><button type="button" class="btn primary big" id="tsend" ${turnValid(pd, P.u) ? '' : 'disabled'}>${esc(submitLabel(pd, P.u))}</button></div>`;
+      document.title = '● Your turn · Meowfia Lab';
+    } else {
+      document.title = 'Playing · Meowfia Lab';
+      const others = ((s || {}).asking || []).filter((n) => n !== r.me);
+      let line, sub = '', extra = '';
+      if (r.status === 'queued') { line = 'The table is being set'; sub = 'The game starts in a moment.'; }
+      else if (r.status === 'done') { line = 'The game is over'; sub = 'Thanks for playing.'; extra = r.seats === 'claude' ? `<a class="btn primary" href="#/game/${encodeURIComponent(r.id)}">Read the replay</a>` : '<a class="btn" href="#/run">Play again</a>'; }
+      else if (r.status === 'stopped' || r.status === 'failed') { line = r.status === 'failed' ? 'The game hit a problem' : 'The game is stopped'; sub = 'You can continue it from the run page.'; extra = '<a class="btn" href="#/run">Run page</a>'; }
+      else if (r.over) { line = 'The game is over'; sub = 'The review is being written. The replay opens in a minute.'; }
+      else if (others.length) { line = `Waiting for ${list(others)}`; sub = P.sent ? 'Your move is in.' : 'They are thinking.'; }
+      else { line = 'The Storyteller is working'; sub = ''; }
+      key = 'wait:' + line + sub + r.status;
+      if (key === P.turnKey) return;
+      const busy = r.status === 'running' && !r.over || r.status === 'queued' || (r.over && r.status === 'running');
+      html = `<div class="turn-in waiting">${busy ? '<span class="dots"><i></i><i></i><i></i></span>' : ''}<div><b>${esc(line)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${extra}</div>`;
+    }
+    P.turnKey = key;
+    const ta = document.activeElement, id = ta && box.contains(ta) ? ta.id : '', pos = id && ta.selectionStart;
+    box.innerHTML = html;
+    if (id && $('#' + id)) { const el = $('#' + id); el.focus({ preventScroll: true }); try { el.setSelectionRange(pos, pos); } catch { /* not a text field */ } }
+    const feed = $('#feed'); if (feed && feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 160) feed.scrollTop = feed.scrollHeight;
+  }
+  function refreshSend() {
+    const pd = P.data && P.data.pending, b = $('#tsend'); if (!pd || !b) return;
+    b.disabled = !turnValid(pd, P.u); b.textContent = submitLabel(pd, P.u);
+  }
+  function wireTurn() {
+    const box = $('#turn');
+    const redraw = () => drawTurn(P.data, true);
+    box.addEventListener('click', async (e) => {
+      const pd = P.data && P.data.pending, u = P.u; if (!pd || !u) return;
+      const f = pd.fields, t = e.target;
+      let el;
+      if ((el = t.closest('[data-target]'))) {
+        const n = el.dataset.target, max = f.targets.max ?? 1;
+        if (u.targets.includes(n)) u.targets = u.targets.filter((x) => x !== n);
+        else if (max === 1) u.targets = [n];
+        else if (u.targets.length < max) u.targets.push(n);
+        else u.targets = [u.targets[0], n];
+        return redraw();
+      }
+      if ((el = t.closest('[data-egg]'))) {
+        const id = el.dataset.egg, max = pd.kind === 'day' && u.act === 'sunflower' ? 1 : f.cards.max;
+        if (u.cards.includes(id)) u.cards = u.cards.filter((x) => x !== id);
+        else if (max === 1) u.cards = [id];
+        else if (u.cards.length < max) u.cards.push(id);
+        return redraw();
+      }
+      if ((el = t.closest('[data-role]'))) { u.role = u.role === el.dataset.role ? null : el.dataset.role; return redraw(); }
+      if ((el = t.closest('[data-stepper] button'))) { const st = el.closest('[data-stepper]'); u.number = Math.max(+st.dataset.min, Math.min(+st.dataset.max, (u.number ?? +st.dataset.min) + +el.dataset.dir)); return redraw(); }
+      if (t.closest('[data-caw]')) { u.caw = !u.caw; return redraw(); }
+      if (t.closest('[data-wopen]')) { u.wopen = !u.wopen; if (!u.wopen) { u.wto = ''; u.wtext = ''; } return redraw(); }
+      if ((el = t.closest('[data-action]'))) { u.act = u.act === el.dataset.action ? '' : el.dataset.action; u.cards = []; return redraw(); }
+      if (t.closest('#tsend')) {
+        if (!turnValid(pd, u)) return;
+        const limit = (f.say || {}).words || 80;
+        const action = { targets: u.targets, role: u.role, number: f.number ? u.number : null, cards: u.cards, say: u.say.trim().split(/\s+/).slice(0, limit).join(' '), caw: u.caw, note: '',
+          whisper: u.wto && u.wtext.trim() ? { to: [u.wto], text: u.wtext.trim() } : null,
+          special: u.act ? { action: u.act, player: u.aplayer || null, animal: u.aanimal || null, guesses: Object.entries(u.guesses).map(([player, animal]) => ({ player, animal })) } : null };
+        t.closest('#tsend').disabled = true;
+        try {
+          await ctl(`/api/play/${encodeURIComponent(P.id)}/answer`, { body: { id: pd.id, action } });
+          P.sent = pd.id; P.turnKey = '';
+          drawTurn(P.data);
+        } catch (err) { toast(err.message, true); P.turnKey = ''; drawTurn(P.data, true); }
+      }
+    });
+    box.addEventListener('input', (e) => {
+      const u = P.u, t = e.target; if (!u) return;
+      if (t.id === 'tsay') { u.say = t.value; const pd = P.data.pending, limit = ((pd.fields.say || {}).words) || 80, n = words(u.say), c = $('#tcount'); c.textContent = `${n}/${limit}`; c.classList.toggle('over', n > limit); refreshSend(); }
+      else if (t.id === 'twtext') { u.wtext = t.value; refreshSend(); }
+    });
+    box.addEventListener('change', (e) => {
+      const u = P.u, t = e.target; if (!u) return;
+      if ('wto' in t.dataset) u.wto = t.value;
+      else if ('aplayer' in t.dataset) u.aplayer = t.value;
+      else if ('aanimal' in t.dataset) u.aanimal = t.value;
+      else if (t.dataset.guess) u.guesses[t.dataset.guess] = t.value;
+      else return;
+      refreshSend();
+    });
+    box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'tsay') { e.preventDefault(); const b = $('#tsend'); if (b && !b.disabled) b.click(); } });
   }
 
   boot();
