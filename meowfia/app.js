@@ -668,14 +668,12 @@
     const base = v.extends ? D.variants.find((x) => x.name === v.extends) : null;
     const changed = new Set((v.changes || []).map((c) => c.key));
     page(`<header class="page-head"><h1>Rules</h1><p>The rules exactly as the players read them, and the settings behind them.</p></header>
-      <div class="chiprow" id="vpick">${D.variants.map((x) => `<a class="fchip${x.name === v.name ? ' on' : ''}" href="#/rules/${encodeURIComponent(x.name)}">${esc(x.name)}</a>`).join('')}</div>
       <section class="block lead-block"><h2>${esc(v.name)}</h2><p class="muted">${esc(v.description || '')}${base ? ` Based on ${esc(base.name)}.` : ''}</p>
         ${v.changes && v.changes.length ? `<ul class="plain diff">${v.changes.map((c) => { const m = settingMeta(c.key); if (c.key.startsWith('text.')) return `<li><b>${esc(c.key.slice(5))}</b> ${esc(c.to)}</li>`; if (c.key === 'rules.notes') return c.to.map((x) => `<li><b>Clarified</b> ${esc(x)}</li>`).join(''); if (c.key.startsWith('deck.')) { const gone = (c.from || []).filter((x) => !c.to.includes(x)), added = c.to.filter((x) => !(c.from || []).includes(x)); return `<li><b>${c.key === 'deck.roles' ? 'Animals' : 'Flowers'}</b> ${esc([gone.length ? 'without ' + list(gone) : '', added.length ? 'with ' + list(added) : ''].filter(Boolean).join('; '))}</li>`; } return `<li><b>${esc(m ? m.label : c.key)}</b> ${esc(showValue(m, c.to))} <small>was ${esc(c.from === undefined || c.from === null ? 'unset' : showValue(m, c.from))}</small></li>`; }).join('')}</ul>` : ''}
-        <a class="btn small" href="#/run?variant=${encodeURIComponent(v.name)}">${ui('run', 14)}Play this version</a></section>
+        <a class="btn small" href="#/run?variant=${encodeURIComponent(v.name)}">${ui('run', 14)}Play with these rules</a></section>
       <div class="rules-layout"><article class="rules-text">${rulesHTML(v.rules)}</article>
       <aside class="settings">${D.meta.groups.map((grp) => `<section class="block"><h3>${esc(grp.label)}</h3><dl class="facts tight">${D.meta.settings.filter((s) => s.group === grp.id).map((s) => `<dt>${esc(s.label)}</dt><dd class="${changed.has(s.key) ? 'changed' : ''}">${esc(showValue(s, getPath(v.settings, s.key)))}</dd>`).join('')}</dl></section>`).join('')}
         <section class="block"><h3>Deck</h3><dl class="facts tight"><dt>Animals</dt><dd>${v.settings.deck.roles.length + 2}</dd><dt>Flowers</dt><dd>${v.settings.deck.flowers.length}</dd><dt>Rounds</dt><dd>${v.settings.game.rounds}</dd><dt>Players</dt><dd>${v.settings.game.players}</dd></dl></section></aside></div>`);
-    const on = $('#vpick .on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 
   /* ================= simulations ================= */
@@ -855,16 +853,13 @@
       <div class="choice2">${[['game', 'Real game', 'Claude plays every seat. You get a full replay, private reasoning and a written review. Takes a few minutes and uses your subscription.'], ['sim', 'Simulation set', 'Hundreds of random-bot games in seconds, reported as statistics about the mechanics. Free.']].map(([k, t, d]) => `<button type="button" class="choice${B.kind === k ? ' on' : ''}" data-set="kind" data-value="${k}" aria-pressed="${B.kind === k}"><span class="choice-ic">${ui(k === 'game' ? 'games' : 'sims', 22)}</span><b>${t}</b><span>${d}</span></button>`).join('')}</div>`;
   }
   function drawGame() {
-    const v = variantOf();
     $('#sec-game').innerHTML = `${secHead(2, 'The game')}
-      <div class="frow"><div class="flabel"><b>Version</b><span>${esc(v.description || '')}</span></div>
-        <div class="vpick">${D.variants.map((x) => `<button type="button" class="fchip${x.name === v.name ? ' on' : ''}" data-set="variant" data-value="${esc(x.name)}">${esc(x.name)}</button>`).join('')}</div></div>
       <div class="fgrid">
         <div class="fcell"><b>Players</b>${stepper('players', nPlayers(), 4, 8)}</div>
         <div class="fcell"><b>Rounds</b>${stepper('rounds', nRounds(), 1, 10)}</div>
         ${B.kind === 'sim' ? `<div class="fcell"><b>Games</b><div class="seg small">${[100, 500, 1000, 3000].map((n) => `<button type="button" class="${B.games === n ? 'on' : ''}" data-set="games" data-value="${n}">${n}</button>`).join('')}</div></div>` : ''}
         <div class="fcell seedcell"><b>Seed</b><div class="seedbox"><input type="number" inputmode="numeric" id="seed" value="${esc(B.seed)}" placeholder="Random" aria-label="Seed"><button type="button" class="icon-btn" data-act="dice" aria-label="Pick a random seed">${ui('dice', 18)}</button></div></div>
-      </div><p class="fine">The same seed gives the same starting deck, hands and Meowfia rolls, so two versions can be compared fairly.</p>`;
+      </div><p class="fine">The same seed gives the same starting deck, hands and Meowfia rolls, so two setups can be compared fairly.</p>`;
   }
   function drawPlayers() {
     const box = $('#sec-players');
@@ -920,7 +915,7 @@
   }
   function drawRules() {
     const n = Object.keys(B.rules).filter((k) => B.rules[k] !== baseVal(k)).length;
-    $('#sec-rules').innerHTML = `${secHead(5, 'The rules', `Change any rule for this run. ${n ? plural(n, 'rule') + ' changed.' : 'Nothing changed yet.'}`)}
+    $('#sec-rules').innerHTML = `${secHead(5, 'The rules', `Every setting, section by section. Switch any of them for this run. ${n ? plural(n, 'setting') + ' changed.' : 'Nothing changed yet.'}`)}
       ${D.meta.groups.map((g, i) => { const items = D.meta.settings.filter((s) => s.group === g.id); const ch = items.filter((s) => s.key in B.rules && B.rules[s.key] !== baseVal(s.key)).length; return `<details class="rgroup" data-group="${g.id}" ${store.get('rg-' + g.id, i === 0) ? 'open' : ''}><summary><div><b>${esc(g.label)}</b><span>${esc(g.help)}</span></div>${ch ? pill(ch + ' changed', 'yolk') : ''}${ui('down', 18)}</summary>${items.map(control).join('')}</details>`; }).join('')}
       <details class="rgroup" data-group="raw" ${B.raw ? 'open' : ''}><summary><div><b>Anything else</b><span>Settings written by hand, one per line.</span></div>${ui('down', 18)}</summary>
         <textarea id="raw" rows="3" spellcheck="false" placeholder="section.key=value, for example&#10;deck.duplicate_values=[1, 1, 13, 13]">${esc(B.raw)}</textarea></details>`;
@@ -928,7 +923,6 @@
   function summaryLines() {
     const p = payload(), lines = [];
     lines.push(['Type', p.type === 'sim' ? `${p.games.toLocaleString()} simulated games` : 'Real game']);
-    lines.push(['Version', p.variant]);
     lines.push(['Table', `${p.players} players, ${plural(p.rounds, 'round')}`]);
     if (p.human) lines.push(['You play', p.human]);
     if (p.type === 'game') { const mixed = Object.keys(p.seat_models).length; lines.push([p.human ? 'Against' : 'Played by', p.opponents === 'random' ? 'Practice bots' : model(p.model) + (mixed ? ` and ${plural(mixed, 'other seat')}` : '')]); }
@@ -944,9 +938,9 @@
     else if (R.state === 'checking') action = '<button type="button" class="btn primary big" disabled>Looking for the PC…</button>';
     else action = `<button type="button" class="btn primary big" disabled>${R.state === 'down' ? 'The PC is unreachable' : 'Runs are not set up here'}</button>`;
     side.innerHTML = `<div class="sum"><h3>Your run</h3><dl class="facts tight">${summaryLines().map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-      ${ch.length ? `<h4>${plural(ch.length, 'change')} from ${esc(p.variant)}</h4><ul class="plain sumlist">${ch.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="fine">Standard rules and cards.</p>'}
+      ${ch.length ? `<h4>${plural(ch.length, 'change')} from the standard game</h4><ul class="plain sumlist">${ch.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="fine">Standard rules and cards.</p>'}
       ${action}${hint ? `<p class="fine">${hint}</p>` : ''}
-      <div class="sum-more">${R.state === 'ok' && p.set.length ? `<button type="button" class="link" data-act="save">${ui('save', 14)}Save as a version</button>` : ''}<button type="button" class="link" data-act="copy">${ui('copy', 14)}Copy command</button><button type="button" class="link" data-act="reset">${ui('reset', 14)}Start over</button></div></div>`;
+      <div class="sum-more"><button type="button" class="link" data-act="copy">${ui('copy', 14)}Copy command</button><button type="button" class="link" data-act="reset">${ui('reset', 14)}Start over</button></div></div>`;
     bar.innerHTML = `<div class="startbar-in"><div><b>${p.type === 'sim' ? p.games.toLocaleString() + ' sim games' : 'Real game'}</b><span>${p.players} players · ${plural(p.rounds, 'round')}${ch.length ? ' · ' + plural(ch.length, 'change') : ''}</span></div>${action.replace(' big', '').replace('id="handover"', 'data-handover')}</div>`;
     const enc = btoa(unescape(encodeURIComponent(JSON.stringify(B)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     $$('#handover, [data-handover]').forEach((a) => { a.href = `${D.config.control}/#/run?c=${enc}`; });
@@ -1023,7 +1017,6 @@
         else if (a === 'rule-reset') { delete B.rules[el.dataset.key]; redrawRule(el.dataset.key); if (el.dataset.key === 'game.pool_reveal') drawCards(); }
         else if (a === 'reset') { B = Object.assign(blank(), { variant: D.variants[0].name }); R.q = ''; drawAll(); toast('Back to the standard setup.'); }
         else if (a === 'copy') { try { await navigator.clipboard.writeText(command()); toast('Command copied. Run it in sim/ on the PC.'); } catch { openSheet(`<h2>Command</h2><p class="fine">Run it in the sim folder on the PC.</p><pre class="code">${esc(command())}</pre>`, 'Command'); } return; }
-        else if (a === 'save') { saveVersion(); return; }
         else if (a === 'start') { start(el); return; }
         saveB(); drawSummary(); return;
       }
@@ -1061,23 +1054,6 @@
     } catch (err) { toast('Could not start: ' + err.message, true); }
     $$('[data-act="start"]').forEach((b) => { b.disabled = false; });
     void btn;
-  }
-  function saveVersion() {
-    const p = payload();
-    openSheet(`<h2>Save as a version</h2><p class="fine">Keeps these ${plural(p.set.length, 'change')} under a name, so you can run it again and compare it with ${esc(p.variant)}.</p>
-      <label class="field"><span>Name</span><input type="text" id="vname" maxlength="60" placeholder="Meowfia v8.1" autocomplete="off"></label>
-      <label class="field"><span>What it tries</span><input type="text" id="vdesc" maxlength="200" placeholder="Throw at most 3 cards" autocomplete="off"></label>
-      <ul class="plain sumlist">${p.set.map(describe).filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
-      <button type="button" class="btn primary big" id="vsave">Save version</button>`, 'Save as a version', 'form-sheet');
-    $('#vname').focus();
-    $('#vsave').onclick = async () => {
-      try {
-        const res = await ctl('/api/variant', { body: { name: $('#vname').value, description: $('#vdesc').value, extends: p.variant, set: p.set } });
-        D.variants = res.variants;
-        B = Object.assign(B, { variant: res.name, rules: {}, roles: null, flowers: null, startPool: [], reveals: [], raw: '', seats: Object.fromEntries(Object.entries(B.seats).map(([n, s]) => [n, { model: s.model }])) });
-        saveB(); closeSheet(); drawAll(); toast(`Saved as ${res.name}.`);
-      } catch (err) { toast(err.message, true); }
-    };
   }
 
   /* ================= playing a seat ================= */
@@ -1213,7 +1189,7 @@
     const s = (P.data || {}).state; if (!s) return;
     const me = s.me, c = D.card[me.role];
     openSheet(`<header class="sheet-who"><span class="av xl ${sideClass(me.alignment)}">${me.role ? icon(me.role) : eggToken(0)}</span><div><h2>${me.role ? 'The ' + esc(me.role) : esc(me.name)}</h2><div class="pills">${sidePill(me.alignment)}${me.dead ? pill('Dead', 'muted') : ''}${me.winks ? pill(plural(me.winks, 'Wink'), 'yolk') : ''}</div></div></header>
-      ${c ? `<p class="me-text">${esc(((D.variants.find((v) => v.name === P.data.variant) || {}).settings || {}).text && D.variants.find((v) => v.name === P.data.variant).settings.text[me.role] || c.text)}</p>` : ''}
+      ${c ? `<p class="me-text">${esc(me.text || c.text)}</p>` : ''}
       <h4>Your nest · ${me.hand.length}</h4><div class="eggs roomy">${me.hand.map(eggOf).join('') || '<span class="muted">Empty</span>'}</div>
       <h4>Your score</h4><p><b>${me.banked + me.hand.length}</b> points so far: ${me.banked} banked and ${me.hand.length} for cards kept.</p>
       <p class="fine">${me.alignment === 'Meowfia' ? 'You are Meowfia this round: get a Farm player eggsecuted.' : me.alignment === 'Farm' ? 'You are Farm this round: get a Meowfia player eggsecuted.' : ''}</p>`, 'You');
