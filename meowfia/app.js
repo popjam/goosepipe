@@ -449,7 +449,7 @@
     }).join('')}</div><p class="fine">${s ? 'Tap a player to follow their round.' : 'Each player knows only their own animal. Tap a player to see what the table could see.'}</p>`;
     add('pool', 'Pool', 'pool', `${plural(rec.revealed.length, 'new card')}`, pool);
     add('deal', 'Deal', 'deal', s ? 'Who was secretly what' : 'Secret', deal);
-    if (rec.dusk) add('dusk', 'Dusk', 'dawn', 'Nightshade: talk before the night', dayLog(g, rec.dusk, seen(start), see));
+    if (rec.dusk) add('dusk', 'Dusk', 'dawn', 'Talk before the night', dayLog(g, rec.dusk, seen(start), see));
 
     rec.cycles.forEach((cyc, ci) => {
       const again = ci > 0 ? ' again' : '';
