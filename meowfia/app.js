@@ -1353,6 +1353,7 @@
   function turnValid(pd, u) {
     const f = pd.fields;
     if (pd.kind === 'day' && liveTurn(pd) && dayIdle(u)) return false;
+    if (pd.kind === 'handshake') return u.number === 0 || u.number === 1;
     if (f.targets && (u.targets.length < (f.targets.min ?? 1) || u.targets.length > (f.targets.max ?? 1))) return false;
     if (f.role && f.role.required !== false && f.role.options.length && !u.role) return false;
     if (f.cards && pd.kind !== 'day' && (u.cards.length < f.cards.min || u.cards.length > f.cards.max)) return false;
@@ -1369,6 +1370,7 @@
     if (pd.kind === 'night') return 'Confirm';
     if (pd.kind === 'discard') return `Discard ${plural(u.cards.length, 'card')}`;
     if (pd.kind === 'extend') return u.cards.length ? 'Pay one egg' : 'Don\'t pay';
+    if (pd.kind === 'handshake') return u.number === 1 ? 'Shake hands' : u.number === 0 ? 'Decline the handshake' : 'Accept or decline';
     if (pd.kind === 'vote') { const n = pd.fields.cards ? u.cards.length : u.number; return u.targets[0] ? `Throw ${plural(n || 0, 'egg')} at ${u.targets[0]}` : 'Choose who to egg'; }
     return '';
   }
@@ -1401,6 +1403,9 @@
       if (f.number) h += `<div class="t-field row"><span class="label">Stolen eggs to pass on</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
     } else if (pd.kind === 'discard') {
       h += `<div class="t-head"><b>You lost ${plural(f.cards.min, 'egg')}</b><span>Choose what to discard.</span></div>${cardPick(pd, u, 'Your nest')}`;
+    } else if (pd.kind === 'handshake') {
+      const who = (pd.meta || {}).from || 'A player';
+      h += `<div class="t-head"><b>${esc(who)} offers you a handshake</b><span>Golden Wattle: bonded players each score +3 if they are on the same side. If not, the Meowfia player scores +3 and the Farm player loses 3.</span></div><div class="seg shake">${[[1, 'Accept'], [0, 'Decline']].map(([v, l]) => `<button type="button" class="${u.number === v ? 'on' : ''}" data-shake="${v}">${l}</button>`).join('')}</div>`;
     } else if (pd.kind === 'extend') {
       h += `<div class="t-head"><b>The day is ending</b><span>Mulberry: pay one egg for one more turn of talk?</span></div>${cardPick(pd, u, 'Pay with')}`;
     } else if (pd.kind === 'vote') {
@@ -1443,9 +1448,11 @@
       document.title = 'Paused · Meowfia Lab';
     } else if (pd && s && P.sent !== pd.id) {
       if (P.pendingId !== pd.id) {
-        const typed = P.u && liveTurn(pd) ? P.u.say : '';      // live talk can reopen your turn: keep what you were typing
+        if (P.u && P.u.say) P.draft = P.u.say;
+        const typed = liveTurn(pd) ? (P.draft || '') : '';
+        if (liveTurn(pd)) P.draft = '';      // live talk can reopen your turn: keep what you were typing
         P.pendingId = pd.id; P.u = blankTurn(); P.u.say = typed;
-        if (pd.fields.number) P.u.number = pd.fields.number.min;
+        if (pd.fields.number) P.u.number = pd.kind === 'handshake' ? null : pd.fields.number.min;
         if (navigator.vibrate) navigator.vibrate(25);
         force = true;
       }
@@ -1510,6 +1517,7 @@
       }
       if ((el = t.closest('[data-role]'))) { u.role = u.role === el.dataset.role ? null : el.dataset.role; return redraw(); }
       if ((el = t.closest('[data-stepper] button'))) { const st = el.closest('[data-stepper]'); u.number = Math.max(+st.dataset.min, Math.min(+st.dataset.max, (u.number ?? +st.dataset.min) + +el.dataset.dir)); return redraw(); }
+      if ((el = t.closest('[data-shake]'))) { u.number = +el.dataset.shake; return redraw(); }
       if (t.closest('[data-more]')) { u.more = !u.more; return redraw(); }
       if (t.closest('[data-caw]')) { u.caw = !u.caw; u.more = false; return redraw(); }
       if (t.closest('[data-wopen]')) { u.wopen = !u.wopen; u.more = false; if (!u.wopen) { u.wto = ''; u.wtext = ''; } return redraw(); }
