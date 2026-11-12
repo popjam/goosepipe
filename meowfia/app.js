@@ -465,7 +465,7 @@
       else if (e.k === 'system') { if (!e.text.startsWith('Nest sizes:')) h += `<div class="sys">${esc(e.text)}</div>`; }
       else if (e.k === 'say') {
         const hide = e.anon && !canSee(e.p);
-        h += `<div class="msg">${hide ? '<span class="av anon">?</span>' : av(g, e.p, people[e.p])}<div class="msg-body"><div class="msg-from">${hide ? 'Someone' : esc(e.p)}${e.anon ? pill('eyes shut', 'flower') : ''}${e.bids && !hide ? ` <small>bids: ${Object.entries(e.bids).sort((x, y) => y[1] - x[1]).map(([n, v]) => `${esc(n)} ${v}`).join(' · ')}</small>` : ''}</div><div class="bubble">${esc(e.text)}</div>${thought(e, e.p)}</div></div>`;
+        h += `<div class="msg">${hide ? '<span class="av anon">?</span>' : av(g, e.p, people[e.p])}<div class="msg-body"><div class="msg-from">${hide ? 'Someone' : esc(e.p)}${e.anon ? pill('eyes shut', 'flower') : ''}${e.at && !hide ? ` <small>to ${esc(e.at)}</small>` : ''}${e.bids && !hide ? ` <small>bids: ${Object.entries(e.bids).sort((x, y) => y[1] - x[1]).map(([n, v]) => `${esc(n)} ${v}`).join(' · ')}</small>` : ''}</div><div class="bubble">${esc(e.text)}</div>${thought(e, e.p)}</div></div>`;
       } else if (e.k === 'whisper') {
         if (canSee(e.p) || canSee(e.to)) h += `<div class="msg whisper">${av(g, e.p, people[e.p])}<div class="msg-body"><div class="msg-from">${esc(e.p)}${pill('whispers to ' + esc(e.to), 'flower')}</div><div class="bubble">${esc(e.text)}</div>${thought(e, e.p)}</div></div>`;
       } else if (e.k === 'quiet') {
@@ -1324,7 +1324,8 @@
     let key, html;
     if (pd && s && P.sent !== pd.id) {
       if (P.pendingId !== pd.id) {
-        P.pendingId = pd.id; P.u = blankTurn();
+        const typed = P.u && liveTurn(pd) ? P.u.say : '';      // live talk can reopen your turn: keep what you were typing
+        P.pendingId = pd.id; P.u = blankTurn(); P.u.say = typed;
         if (pd.fields.number) P.u.number = pd.fields.number.min;
         if (navigator.vibrate) navigator.vibrate(25);
         force = true;
@@ -1400,14 +1401,14 @@
           whisper: u.wto && u.wtext.trim() ? { to: [u.wto], text: u.wtext.trim() } : null,
           special: u.act ? { action: u.act, player: u.aplayer || null, animal: u.aanimal || null, guesses: Object.entries(u.guesses).map(([player, animal]) => ({ player, animal })) } : null };
         el.disabled = true;
-        P.sent = pd.id; P.turnKey = '';
+        P.sent = pd.id; P.turnKey = ''; u.say = '';
         if (pd.kind === 'day' && say) {              // show your message at once; the real one replaces it
           P.ghost = say;
           $('#ftyping').insertAdjacentHTML('beforebegin', `<div class="in f-msg mine ghost" id="fghost"><div class="f-col"><div class="bubble">${esc(say)}</div></div></div>`);
         }
         drawTurn(P.data); toBottom(true);
         try { await ctl(`/api/play/${encodeURIComponent(P.id)}/answer`, { body: { id: pd.id, action } }); }
-        catch (err) { toast(err.message, true); P.sent = null; P.turnKey = ''; P.ghost = ''; const g = $('#fghost'); if (g) g.remove(); drawTurn(P.data, true); }
+        catch (err) { toast(err.message, true); P.sent = null; P.turnKey = ''; P.ghost = ''; u.say = say; const g = $('#fghost'); if (g) g.remove(); drawTurn(P.data, true); }
       }
     });
     box.addEventListener('input', (e) => {
