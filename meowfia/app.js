@@ -361,8 +361,8 @@
     add('setup', 'Setup', 'run', gameChanges(g).join(' · ') || 'Standard game', `<dl class="facts">
       <dt>Version</dt><dd><a href="#/rules/${encodeURIComponent(g.variant)}">${esc(g.variant)}</a></dd>
       ${ov.length ? `<dt>Changes</dt><dd><ul class="plain">${ov.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd>` : ''}
-      <dt>Players</dt><dd>${g.players.map((n) => `<span class="pname">${dot(g, n)}${esc(n)}${g.human === n ? ' <small>played by a person</small>' : (g.seat_models || {})[n] ? ` <small>${esc(model(g.seat_models[n]))}</small>` : ''}</span>`).join('')}</dd>
-      <dt>Played by</dt><dd>${esc(model(g.model))}${g.effort ? `, ${esc(g.effort)} effort` : ''}${g.review_model && g.review ? `; reviewed by ${esc(model(g.review_model))}` : ''}</dd>
+      <dt>Players</dt><dd>${g.players.map((n) => `<span class="pname">${dot(g, n)}${esc(n)}${g.human === n ? ' <small>played by a person</small>' : (g.seat_models || {})[n] || (g.seat_efforts || {})[n] ? ` <small>${esc([(g.seat_models || {})[n] ? model(g.seat_models[n]) : '', (g.seat_efforts || {})[n] ? (EFFORT[g.seat_efforts[n]] || g.seat_efforts[n]).toLowerCase() + ' thinking' : ''].filter(Boolean).join(', '))}</small>` : ''}</span>`).join('')}</dd>
+      <dt>Played by</dt><dd>${esc(model(g.model))}${g.effort ? `, ${esc((EFFORT[g.effort] || g.effort).toLowerCase())} thinking` : ''}${g.review_model && g.review ? `; reviewed by ${esc(model(g.review_model))}` : ''}</dd>
       <dt>Seed</dt><dd>${g.seed}</dd>
       <dt>Length</dt><dd>${g.minutes ? g.minutes + ' minutes' : 'unknown'}${g.usage ? `, ${g.usage.calls} turns` : ''}</dd>
       ${g.usage ? `<dt>Usage</dt><dd>About $${g.usage.api_equivalent_usd} at API prices, covered by the subscription</dd>` : ''}</dl>`);
@@ -743,6 +743,8 @@
   function stopPolling() { if (poll) { clearInterval(poll); poll = null; } }
   const MODELS = ['haiku', 'sonnet', 'opus', 'fable'];
   const MODEL_NOTE = { haiku: 'Fast and light on usage. Misreads rules more often.', sonnet: 'Plays well. The usual choice.', opus: 'Sharper deduction. Heavy on usage.', fable: 'The strongest player. Heaviest on usage.' };
+  const EFFORT_OPTS = [['', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Very high'], ['max', 'Maximum']];
+  const EFFORT = Object.fromEntries(EFFORT_OPTS);
   const blank = () => ({ kind: 'game', variant: '', players: null, rounds: null, seed: '', games: 500, model: 'sonnet', effort: '', review: 'opus', probes: true, human: '', opponents: 'claude', seats: {}, seatRounds: 'all', roles: null, flowers: null, startPool: [], reveals: [], rules: {}, raw: '' });
   let B = Object.assign(blank(), store.get('builder', {}));
   const R = { status: null, state: 'checking', cardTab: 'roles', q: '', go: false };
@@ -779,16 +781,17 @@
   }
   function payload() {
     const seat_models = {};
-    for (const n of seatNames()) { const m = (B.seats[n] || {}).model; if (m && m !== B.model) seat_models[n] = m; }
+    const seat_efforts = {};
+    for (const n of seatNames()) { const m = (B.seats[n] || {}).model; if (m && m !== B.model) seat_models[n] = m; const e = (B.seats[n] || {}).effort; if (e && e !== B.effort) seat_efforts[n] = e; }
     const human = isPlay() ? B.human : null;
-    return { type: B.kind, variant: variantOf().name, players: nPlayers(), rounds: nRounds(), seed: B.seed === '' ? null : +B.seed, human, opponents: human && B.opponents === 'random' ? 'random' : 'claude', model: B.model, effort: B.effort || null, review_model: B.review, probes: B.probes, games: B.games, seat_models, set: overridesOf() };
+    return { type: B.kind, variant: variantOf().name, players: nPlayers(), rounds: nRounds(), seed: B.seed === '' ? null : +B.seed, human, opponents: human && B.opponents === 'random' ? 'random' : 'claude', model: B.model, effort: B.effort || null, review_model: B.review, probes: B.probes, games: B.games, seat_models, seat_efforts, set: overridesOf() };
   }
   function command() {
     const p = payload(), q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
     let c = `python3 -m meowsim ${p.type === 'sim' ? 'sim --games ' + p.games : 'play --model ' + p.model} --variant ${q(p.variant)} --players ${p.players} --rounds ${p.rounds}`;
     if (p.seed !== null) c += ` --seed ${p.seed}`;
     if (p.human) c += ` --human ${p.human}` + (p.opponents === 'random' ? ' --seats random' : '');
-    if (p.type === 'game') { c += ` --review-model ${p.review_model}`; if (p.effort) c += ` --effort ${p.effort}`; if (!p.probes) c += ' --no-probes'; for (const [n, m] of Object.entries(p.seat_models)) c += ` --seat-model ${n}=${m}`; }
+    if (p.type === 'game') { c += ` --review-model ${p.review_model}`; if (p.effort) c += ` --effort ${p.effort}`; if (!p.probes) c += ' --no-probes'; for (const [n, m] of Object.entries(p.seat_models)) c += ` --seat-model ${n}=${m}`; for (const [n, e] of Object.entries(p.seat_efforts)) c += ` --seat-effort ${n}=${e}`; }
     for (const o of p.set) c += ` --set ${q(o)}`;
     return c;
   }
@@ -889,21 +892,22 @@
     const seatRow = (n, i) => {
       const s = B.seats[n] || {};
       return `<div class="seatrow"><span class="seatrow-name"><span class="av s tok">${eggToken(i)}</span>${esc(n)}</span>
-        ${B.kind === 'game' ? `<label class="mini"><span>Model</span><select data-seat-model="${esc(n)}"><option value="">Default</option>${MODELS.map((m) => `<option value="${m}" ${s.model === m ? 'selected' : ''}>${MODEL[m]}</option>`).join('')}</select></label>` : ''}
+        ${B.kind === 'game' ? `<label class="mini"><span>Model</span><select data-seat-model="${esc(n)}"><option value="">Table's</option>${MODELS.map((m) => `<option value="${m}" ${s.model === m ? 'selected' : ''}>${MODEL[m]}</option>`).join('')}</select></label>
+        <label class="mini"><span>Thinking</span><select data-seat-effort="${esc(n)}">${EFFORT_OPTS.map(([k, l]) => `<option value="${k}" ${(s.effort || '') === k ? 'selected' : ''}>${k ? l : 'Table\'s'}</option>`).join('')}</select></label>` : ''}
         <div class="mini"><span>Animal</span>${s.role ? `<span class="picked"><button type="button" class="cchip ${typeOf(s.role)}" data-pick="seat:${esc(n)}"><span class="cchip-art">${icon(s.role)}</span><span>${esc(s.role)}</span></button><button type="button" class="x" data-act="clear-seat" data-name="${esc(n)}" aria-label="Clear">${ui('close', 14)}</button></span>` : `<button type="button" class="add" data-pick="seat:${esc(n)}">Dealt at random</button>`}</div>
         <div class="mini"><span>Side</span><div class="seg small">${[['', 'Rolled'], ['Farm', 'Farm'], ['Meowfia', 'Cat']].map(([k, l]) => `<button type="button" class="${(s.side || '') === k ? 'on' : ''}" data-seat-side="${esc(n)}" data-value="${k}">${l}</button>`).join('')}</div></div></div>`;
     };
     const anyFixed = names.some((n) => (B.seats[n] || {}).role || (B.seats[n] || {}).side);
-    const nSet = names.filter((n) => { const x = B.seats[n] || {}; return x.role || x.side || (B.kind === 'game' && x.model); }).length;
+    const nSet = names.filter((n) => { const x = B.seats[n] || {}; return x.role || x.side || (B.kind === 'game' && (x.model || x.effort)); }).length;
     box.innerHTML = `${secHead(3, 'The players', B.kind === 'game' ? 'Who plays, and anything you want to fix about a seat.' : 'Fix a seat\'s animal or side to test a matchup.')}
       ${isPlay() ? `<div class="frow"><div class="flabel"><b>Your seat</b><span>The others wait for you on your turn.</span></div><select data-bind="human" class="auto">${names.map((n) => `<option value="${n}" ${B.human === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div><div class="frow"><div class="flabel"><b>Your opponents</b><span>${B.opponents === 'random' ? 'Random bots answer at once and cost nothing. Good for learning the screens, not for a real game.' : 'Claude plays the other seats.'}</span></div><div class="seg">${[['claude', 'Claude'], ['random', 'Practice bots']].map(([k, l]) => `<button type="button" class="${B.opponents === k ? 'on' : ''}" data-set="opponents" data-value="${k}">${l}</button>`).join('')}</div></div>` : ''}
       ${B.kind === 'game' && !(isPlay() && B.opponents === 'random') ? `<div class="frow"><div class="flabel"><b>Model for the table</b><span>${MODEL_NOTE[B.model]}</span></div><div class="seg">${MODELS.map((m) => `<button type="button" class="${B.model === m ? 'on' : ''}" data-set="model" data-value="${m}">${MODEL[m]}</button>`).join('')}</div></div>
       <div class="fgrid">
-        <label class="fcell"><b>Thinking effort</b><select data-bind="effort">${[['', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']].map(([k, l]) => `<option value="${k}" ${B.effort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="fcell"><b>Thinking effort</b><select data-bind="effort">${EFFORT_OPTS.map(([k, l]) => `<option value="${k}" ${B.effort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label class="fcell"><b>Review written by</b><select data-bind="review">${[...MODELS, 'none'].map((m) => `<option value="${m}" ${B.review === m ? 'selected' : ''}>${m === 'none' ? 'Nobody (skip)' : MODEL[m]}</option>`).join('')}</select></label>
         <div class="fcell wide"><div class="inline"><div><b>Ask who they suspect</b><span>One private question per player before each vote. It feeds the suspicion grid.</span></div>${toggle('probes', B.probes)}</div></div>
       </div>` : ''}
-      <details class="rgroup seatgroup" data-group="seats" ${nSet || store.get('rg-seats', false) ? 'open' : ''}><summary><div><b>Seat by seat</b><span>Give one seat a different model, a chosen animal or a chosen side.</span></div>${nSet ? pill(nSet + ' set', 'yolk') : ''}${ui('down', 18)}</summary>
+      <details class="rgroup seatgroup" data-group="seats" ${nSet || store.get('rg-seats', false) ? 'open' : ''}><summary><div><b>Seat by seat</b><span>Give each seat its own model and thinking level, a chosen animal or a chosen side.</span></div>${nSet ? pill(nSet + ' set', 'yolk') : ''}${ui('down', 18)}</summary>
       <div class="seats">${names.map(seatRow).join('')}</div>
       ${anyFixed ? `<div class="frow slim"><div class="flabel"><b>Fixed seats apply</b></div><div class="seg small">${[['all', 'Every round'], ['first', 'Round 1 only']].map(([k, l]) => `<button type="button" class="${B.seatRounds === k ? 'on' : ''}" data-set="seatRounds" data-value="${k}">${l}</button>`).join('')}</div></div>` : ''}</details>`;
   }
@@ -1055,6 +1059,7 @@
       const t = e.target;
       if (t.dataset.bind) { B[t.dataset.bind] = t.value; if (t.dataset.bind === 'human') drawPlayers(); }
       else if (t.dataset.seatModel) { const n = t.dataset.seatModel; B.seats[n] = { ...(B.seats[n] || {}), model: t.value }; }
+      else if (t.dataset.seatEffort) { const n = t.dataset.seatEffort; B.seats[n] = { ...(B.seats[n] || {}), effort: t.value }; }
       else if (t.dataset.rule) { const rk = t.dataset.rule; B.rules[rk] = t.value; if (B.rules[rk] === baseVal(rk)) delete B.rules[rk]; redrawRule(rk); }
       else return;
       saveB(); drawSummary();
@@ -1131,9 +1136,9 @@
     document.body.classList.add('playing');
     document.title = 'Playing · Meowfia Lab';
     Object.assign(P, { id, alive: true, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '', items: [], phase: 'Setup', unseen: 0, ghost: '' });
-    app.innerHTML = `<div class="play" id="play"><header class="play-top"><a class="icon-btn" href="#/run" aria-label="Leave the table">${ui('back', 20)}</a>
+    app.innerHTML = `<div class="play" id="play"><header class="play-top"><button type="button" class="icon-btn" id="pleave" aria-label="Leave, pause or quit">${ui('back', 20)}</button>
         <div class="play-phase" id="pphase"><b>Meowfia</b><span>Connecting</span></div>
-        <button type="button" class="icon-btn" id="ptable" aria-label="The table and what you did">${ui('eye', 20)}</button><button type="button" class="icon-btn" id="ppool" aria-label="Cards in the pool">${ui('pool', 20)}</button><button type="button" class="icon-btn" id="prules" aria-label="Rules">${ui('rules', 20)}</button></header>
+        <button type="button" class="icon-btn" id="ppause" aria-label="Pause the game" hidden>${ui('pause', 20)}</button><button type="button" class="icon-btn" id="ptable" aria-label="The table and what you did">${ui('eye', 20)}</button><button type="button" class="icon-btn" id="ppool" aria-label="Cards in the pool">${ui('pool', 20)}</button><button type="button" class="icon-btn" id="prules" aria-label="Rules">${ui('rules', 20)}</button></header>
       <div class="play-body"><aside class="hud" id="hud"></aside>
         <section class="play-main"><div class="mhud" id="mhud"></div>
           <div class="feed-wrap"><div class="feed" id="feed"><div class="loading">Taking your seat</div></div>
@@ -1142,6 +1147,25 @@
     $('#prules').onclick = () => { const v = D.variants.find((x) => x.name === (P.data || {}).variant) || D.variants[0]; openSheet(`<h2>Rules</h2><div class="rules-text flat">${rulesHTML(v.rules)}</div>`, 'Rules'); };
     $('#ppool').onclick = () => { const st = (P.data || {}).state || {}; openSheet(`<h2>In the pool</h2><p class="fine">Tap a card to read it.</p>${(st.flowers || []).length ? `<h4>Flowers this round</h4><div class="pills">${st.flowers.map((f) => cchip(f)).join('')}</div>` : ''}<h4>Animals</h4><div class="pills">${(st.pool || []).map((x) => cchip(x)).join('')}</div>`, 'In the pool'); };
     $('#ptable').onclick = () => { const r = P.data; if (!r || !r.state) return; openSheet(`<h2>The table</h2>${playTable(r)}<h4>What you did this round</h4>${didList(r.state)}`, 'The table'); drawLines(); setTimeout(drawLines, 400); };
+    $('#ppause').onclick = () => setPause(!(P.data || {}).paused);
+    $('#pleave').onclick = () => {
+      const r = P.data || {}, live = r.status === 'running' || r.status === 'queued';
+      if (!live) { location.hash = '#/run'; return; }
+      openSheet(`<h2>Leave the table?</h2><div class="leave">
+        <button type="button" class="c-opt" data-leave="pause"><b>${r.paused ? 'Carry on playing' : 'Pause the game'}</b><span>${r.paused ? 'The table picks up where it stopped.' : 'Nothing more happens until you come back. Replies already being written are held.'}</span></button>
+        <button type="button" class="c-opt" data-leave="go"><b>Leave it running</b><span>The game waits at your next turn. Come back from the run page.</span></button>
+        <button type="button" class="c-opt danger" data-leave="quit"><b>Quit the game</b><span>Ends it now. Finished rounds are kept, so it can be continued from the run page.</span></button></div>`, 'Leave the table');
+      $('.leave').onclick = async (e) => {
+        const b = e.target.closest('[data-leave]'); if (!b) return;
+        const what = b.dataset.leave;
+        if (what === 'pause') { closeSheet(); return setPause(!r.paused); }
+        if (what === 'quit') {
+          if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.querySelector('b').textContent = 'Tap again to quit'; return; }
+          try { await ctl('/api/stop', { body: { id: P.id } }); } catch (err) { return toast(err.message, true); }
+        }
+        closeSheet(); location.hash = '#/run';
+      };
+    };
     $('#feed').addEventListener('scroll', () => { if (atBottom($('#feed'))) { P.unseen = 0; $('#fnew').hidden = true; } }, { passive: true });
     $('#fnew').onclick = () => toBottom(true);
     $('#mhud').addEventListener('click', (e) => { if (e.target.closest('[data-me]')) openMe(); });
@@ -1163,6 +1187,31 @@
     }
   }
   function leavePlay() { P.alive = false; document.body.classList.remove('playing'); }
+  async function setPause(on) {
+    try { await ctl(`/api/play/${encodeURIComponent(P.id)}/pause`, { body: { on } }); if (P.data) { P.data.paused = on; P.turnKey = ''; applyPlay({ ...P.data, items: [] }); } }
+    catch (err) { toast(err.message, true); }
+  }
+  const signed = (n) => (n > 0 ? '+' + n : String(n));
+  // The round that just ended: who went out, how you did, and (when the table shows it) everyone's animal and score.
+  function resultsHTML(r) {
+    const x = r.state.result, y = x.you, me = r.me, you = (n) => (n === me ? 'You' : esc(n));
+    const out = x.eliminated.length ? `${list(x.eliminated.map((n) => (n === me ? 'You' : n)).map(esc))} ${x.eliminated.length > 1 || x.eliminated[0] === me ? 'were' : 'was'} eggsecuted${x.eliminated.map((n) => (x.revealed[n] ? ` (${esc(x.revealed[n])})` : '')).join('')}` : 'Nobody was eggsecuted';
+    const side = x.alone ? `${you(x.alone)} won the round alone` : x.corpse ? 'Corpse Flower keeps the result hidden' : x.team && x.team !== 'Nobody' ? `${esc(x.team)} won the round${x.goose ? ', and the Goose swapped winners and losers for scoring' : ''}` : '';
+    const verdict = x.final ? (x.winners.includes(me) ? (x.winners.length > 1 ? 'You tied for the win' : 'You won the game') : `${list(x.winners.map(esc))} won the game`)
+      : x.corpse ? 'Result hidden' : y.result === 'won' ? 'You won the round' : y.result === 'lost' ? 'You lost the round' : y.result === 'clownfish' ? 'Your eggs went to the Clownfish' : 'No result for you';
+    const tone = x.final ? (x.winners.includes(me) ? 'won' : 'lost') : y.result === 'won' ? 'won' : y.result === 'lost' ? 'lost' : '';
+    const rows = [...x.players].sort((a, b) => (x.final ? (b.score ?? 0) - (a.score ?? 0) : 0)).map((p) => {
+      const known = p.role !== undefined;
+      return `<li class="rr${p.name === me ? ' me' : ''}${p.dead ? ' dead' : ''}"><${known ? `button type="button" data-card="${esc(p.role)}"` : 'span'} class="av tok ${known ? sideClass(p.alignment) : ''}">${known ? icon(p.role) : eggToken(r.players.indexOf(p.name))}</${known ? 'button' : 'span'}>
+        <span class="rr-who"><b>${you(p.name)}</b><small>${known ? `${esc(p.role)} · ${esc(p.alignment)}` : 'Animal hidden'}${p.target ? ` · ${plural(p.cards, 'egg')} at ${p.target === me ? 'you' : esc(p.target)}` : ''}</small></span>
+        ${known ? `<span class="rr-num"><b>${p.score}</b><small>${signed(p.gained)}</small></span>` : ''}</li>`;
+    }).join('');
+    return `<section class="results ${tone}"><header><small>${x.final ? 'Final result' : `Round ${x.round} of ${r.state.rounds}`}</small><h3>${verdict}</h3>
+        <p>${x.corpse ? '' : `<b>${signed(y.gained)}</b> this round · `}<b>${y.score}</b> points in total</p></header>
+      <p class="rr-out">${out}.${side ? ' ' + side + '.' : ''}</p>
+      <ul class="plain rr-list">${rows}</ul>
+      ${x.show ? '' : `<p class="fine">${x.corpse ? 'Animals and scores stay hidden in a Corpse Flower round.' : 'Other players\' animals and scores stay hidden until the game ends. To see them after every round, turn on “Show animals after each round” when you set up the game.'}</p>`}</section>`;
+  }
 
   function applyPlay(r) {
     const first = !P.data;
@@ -1180,7 +1229,8 @@
       if (!near && html) { P.unseen += r.items.length; $('#fnew').hidden = false; }
     }
     const s = r.state || {};
-    $('#pphase').innerHTML = `<b>${s.round ? `Round ${s.round} of ${s.rounds}` : esc(r.variant)}</b><span>${esc(r.over ? 'Game over' : P.phase)}</span>`;
+    $('#pphase').innerHTML = `<b>${s.round ? `Round ${s.round} of ${s.rounds}` : esc(r.variant)}</b><span>${esc(r.over ? 'Game over' : r.paused ? 'Paused' : P.phase)}</span>`;
+    const pb = $('#ppause'); pb.hidden = r.status !== 'running' || r.over; pb.innerHTML = ui(r.paused ? 'play' : 'pause', 20); pb.classList.toggle('on', !!r.paused); pb.setAttribute('aria-label', r.paused ? 'Carry on playing' : 'Pause the game');
     drawHud(r);
     drawTurn(r);
     drawTyping(r);
@@ -1256,6 +1306,7 @@
     return true;
   }
   function submitLabel(pd, u) {
+    if (pd.kind === 'results') return `Start round ${((P.data.state || {}).round || 0) + 1}`;
     if (pd.kind === 'night') return 'Confirm';
     if (pd.kind === 'discard') return `Discard ${plural(u.cards.length, 'card')}`;
     if (pd.kind === 'extend') return u.cards.length ? 'Pay one egg' : 'Don\'t pay';
@@ -1282,7 +1333,9 @@
   function turnBody(pd, u, s, r) {
     const f = pd.fields, me = s.me;
     let h = '';
-    if (pd.kind === 'night') {
+    if (pd.kind === 'results') {
+      h += s.result ? resultsHTML(r) : '<div class="t-head"><b>The round is over</b></div>';
+    } else if (pd.kind === 'night') {
       h += `<div class="t-head"><b>Night</b><button type="button" class="t-role" data-me>You are the ${esc(me.role)}${ui('info', 14)}</button></div>`;
       if (f.targets) h += playerPick(pd, u, s);
       if (f.role && f.role.options.length) h += `<div class="t-field"><span class="label">${f.role.required === false ? 'Name an animal (only if needed)' : 'Name an animal'}</span><div class="t-roles">${f.role.options.map((a) => `<button type="button" class="cchip ${typeOf(a)}${u.role === a ? ' on' : ''}" data-hold data-card="${esc(a)}" data-role="${esc(a)}"><span class="cchip-art">${icon(a)}</span><span>${esc(a)}</span></button>`).join('')}</div></div>`;
@@ -1322,7 +1375,12 @@
     const box = $('#turn'); if (!box) return;
     const s = r.state, pd = r.pending;
     let key, html;
-    if (pd && s && P.sent !== pd.id) {
+    if (r.paused) {
+      key = 'paused';
+      if (!force && key === P.turnKey) return;
+      html = '<div class="turn-in waiting"><b>Paused</b><button type="button" class="btn primary small" data-unpause>Carry on</button></div>';
+      document.title = 'Paused · Meowfia Lab';
+    } else if (pd && s && P.sent !== pd.id) {
       if (P.pendingId !== pd.id) {
         const typed = P.u && liveTurn(pd) ? P.u.say : '';      // live talk can reopen your turn: keep what you were typing
         P.pendingId = pd.id; P.u = blankTurn(); P.u.say = typed;
@@ -1345,9 +1403,10 @@
       else if (r.over) line = 'Game over. The review is being written…';
       else if (others.length) line = P.sent ? 'Your move is in' : 'Waiting for the others';
       else line = 'The Storyteller is working…';
-      key = 'wait:' + line + r.status;
+      const fin = s && s.result && s.result.final && (r.over || r.status === 'done') ? resultsHTML(r) : '';
+      key = 'wait:' + line + r.status + (fin ? 'final' : '');
       if (key === P.turnKey) return;
-      html = `<div class="turn-in waiting"><b>${esc(line)}</b>${extra}</div>`;
+      html = `<div class="turn-in${fin ? ' yours pick' : ''}">${fin}<div class="turn-in waiting"><b>${esc(line)}</b>${extra}</div></div>`;
     }
     P.turnKey = key;
     const ta = document.activeElement, id = ta && box.contains(ta) ? ta.id : '', pos = id && ta.selectionStart;
@@ -1368,6 +1427,7 @@
     box.addEventListener('click', async (e) => {
       const pd = P.data && P.data.pending, u = P.u, t = e.target;
       if (t.closest('[data-me]')) return openMe();
+      if (t.closest('[data-unpause]')) return setPause(false);
       if (!pd || !u) return;
       const f = pd.fields;
       let el;
