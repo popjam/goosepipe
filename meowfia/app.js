@@ -204,8 +204,9 @@
     const t = (D.meta.setups || {}).testing, at = (k) => { const x = o.find((y) => parseOverride(y)[0] === k); return x ? parseOverride(x)[1] : undefined; };
     const basics = t && Array.isArray(at('game.start_pool')) && sameSet(at('game.start_pool'), t.start_pool) && Array.isArray(at('deck.roles')) && sameSet(at('deck.roles'), t.roles);
     if (basics) o = o.filter((y) => !BASICS.includes(parseOverride(y)[0]) || (parseOverride(y)[0] === 'deck.flowers' && at('deck.flowers').length));
-    return [...new Set([g.variant, modelsOf(g), `${g.players.length} players`, ...(basics ? ['Basics only'] : []), ...o.map(tagOf).filter(Boolean)])];
+    return [...new Set([...(g.variant === D.variants[0].name ? [] : [g.variant]), modelsOf(g), `${g.players.length} players`, ...(basics ? ['Basics only'] : []), ...o.map(tagOf).filter(Boolean)])];
   }
+  const gameChanges = (g) => { const t = gameTags(g); return t.slice(t.indexOf(`${g.players.length} players`) + 1); };
   function tagOf(o) {                            // a changed setting in one to three words
     const [key, v] = parseOverride(o);
     const one = (cards) => { const u = [...new Set(cards)]; return u.length === 1 ? u[0] : 'Chosen reveals'; };
@@ -226,21 +227,24 @@
     return t.replace('{}', m.kind === 'percent' ? Math.round(v * 100) : v);
   }
   const gamePool = (g) => (g.pool || [...new Set(g.rounds.flatMap((r) => r.revealed))]).filter((n) => D.card[n] && !D.card[n].buffer);
+  // One game in the list: the cards that were in play first, then a short title and its tags.
   function gameCard(g) {
-    const title = g.headline || `${g.players.length} players, ${plural(g.rounds.length, 'round')}`;
-    return `<article class="gcard game"><div class="gcard-meta"><span>${when(g.started, true)}</span></div>
-      <h2><a href="#/game/${encodeURIComponent(g.id)}">${esc(title)}</a></h2>
-      <div class="gcard-tags">${gameTags(g).map((t, i) => `<button type="button" class="pill tag${i > 2 ? ' yolk' : ''}${GL.tags.includes(t) ? ' on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-      <div class="gcard-pool">${gamePool(g).map(cdot).join('')}</div></article>`;
+    const title = g.title || g.headline || `${g.players.length} players, ${plural(g.rounds.length, 'round')}`;
+    const tags = gameTags(g);
+    return `<article class="grow"><div class="grow-pool">${gamePool(g).map(cdot).join('')}</div>
+      <h2><a href="#/game/${encodeURIComponent(g.id)}"${g.headline && g.title ? ` title="${esc(g.headline)}"` : ''}>${esc(title)}</a></h2>
+      <div class="grow-tags">${tags.map((t) => `<button type="button" class="pill tag${tags.indexOf(t) >= tags.length - gameChanges(g).length ? ' yolk' : ''}${GL.tags.includes(t) ? ' on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div></article>`;
   }
   function viewGames() {
     page(`<header class="page-head"><h1>Games</h1></header>
-      ${D.games.length ? `<div class="gfilter"><label class="search">${ui('search', 18)}<input type="search" id="gq" placeholder="Search titles, tags, animals or players" value="${esc(GL.q)}" autocomplete="off" aria-label="Search games"></label><div class="gactive" id="gactive"></div></div><div class="glist" id="glist"></div>` : `<div class="empty"><b>No games yet.</b><span>Start the first one from the run page.</span><a class="btn primary" href="#/run">New run</a></div>`}`);
+      ${D.games.length ? `<div class="gfilter"><label class="search">${ui('search', 18)}<input type="search" id="gq" placeholder="Search titles, tags, animals or players" value="${esc(GL.q)}" autocomplete="off" aria-label="Search games"></label><div class="gactive" id="gactive"></div></div><div class="gdays" id="glist"></div>` : `<div class="empty"><b>No games yet.</b><span>Start the first one from the run page.</span><a class="btn primary" href="#/run">New run</a></div>`}`);
     if (!D.games.length) return;
     const draw = () => {
       const q = GL.q.trim().toLowerCase();
-      const items = D.games.filter((g) => { const tags = gameTags(g); return GL.tags.every((t) => tags.includes(t)) && (!q || [g.headline || '', ...tags, ...gamePool(g), ...g.players].join(' ').toLowerCase().includes(q)); });
-      $('#glist').innerHTML = items.map(gameCard).join('') || '<p class="muted">No games match.</p>';
+      const items = D.games.filter((g) => { const tags = gameTags(g); return GL.tags.every((t) => tags.includes(t)) && (!q || [g.title || '', g.headline || '', ...tags, ...gamePool(g), ...g.players].join(' ').toLowerCase().includes(q)); });
+      const days = [];                             // grouped under the day they were played
+      for (const g of items) { const d = when(g.started, true); if (!days.length || days[days.length - 1][0] !== d) days.push([d, []]); days[days.length - 1][1].push(g); }
+      $('#glist').innerHTML = days.map(([d, gs]) => `<section class="gday"><h3>${esc(d)}</h3>${gs.map(gameCard).join('')}</section>`).join('') || '<p class="muted">No games match.</p>';
       $('#gactive').innerHTML = GL.tags.map((t) => `<button type="button" class="pill tag on" data-tag="${esc(t)}">${esc(t)}<b>×</b></button>`).join('') + (GL.tags.length || q ? `<span class="fine">${plural(items.length, 'game')}</span>` : '');
     };
     draw();
