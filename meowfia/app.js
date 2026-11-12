@@ -198,11 +198,11 @@
   }
   // The games list: a title, tags you can filter by, and the cards that were in play.
   const GL = { q: '', tags: [] };
-  const BASICS = ['deck.roles', 'deck.flowers', 'game.start_pool', 'game.pool_reveal', 'game.max_meowfia'];
+  const BASICS = ['deck.roles', 'deck.flowers', 'game.start_pool', 'game.pool_reveal', 'game.max_meowfia', 'game.max_flowers'];
   function gameTags(g) {                         // the "basics only" setup is one tag, not five
     let o = g.overrides || [];
     const t = (D.meta.setups || {}).testing, at = (k) => { const x = o.find((y) => parseOverride(y)[0] === k); return x ? parseOverride(x)[1] : undefined; };
-    const basics = t && Array.isArray(at('game.start_pool')) && sameSet(at('game.start_pool'), t.start_pool) && Array.isArray(at('deck.roles')) && sameSet(at('deck.roles'), t.roles);
+    const basics = t && Array.isArray(at('deck.roles')) && sameSet(at('deck.roles'), t.roles);
     if (basics) o = o.filter((y) => !BASICS.includes(parseOverride(y)[0]) || (parseOverride(y)[0] === 'deck.flowers' && at('deck.flowers').length));
     return [...new Set([...(g.variant === D.variants[0].name ? [] : [g.variant]), modelsOf(g), `${g.players.length} players`, ...(basics ? ['Basics only'] : []), ...o.map(tagOf).filter(Boolean)])];
   }
@@ -361,11 +361,12 @@
     add('setup', 'Setup', 'run', gameChanges(g).join(' · ') || 'Standard game', `<dl class="facts">
       <dt>Version</dt><dd><a href="#/rules/${encodeURIComponent(g.variant)}">${esc(g.variant)}</a></dd>
       ${ov.length ? `<dt>Changes</dt><dd><ul class="plain">${ov.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd>` : ''}
-      <dt>Players</dt><dd>${g.players.map((n) => `<span class="pname">${dot(g, n)}${esc(n)}${g.human === n ? ' <small>played by a person</small>' : (g.seat_models || {})[n] || (g.seat_efforts || {})[n] ? ` <small>${esc([(g.seat_models || {})[n] ? model(g.seat_models[n]) : '', (g.seat_efforts || {})[n] ? (EFFORT[g.seat_efforts[n]] || g.seat_efforts[n]).toLowerCase() + ' thinking' : ''].filter(Boolean).join(', '))}</small>` : ''}</span>`).join('')}</dd>
+      <dt>Players</dt><dd>${g.players.map((n) => `<span class="pname">${dot(g, n)}${esc(n)}${g.human === n ? ' <small>played by a person</small>' : (g.seat_models || {})[n] || (g.seat_efforts || {})[n] || (g.seat_styles || {})[n] ? ` <small>${esc([(g.seat_styles || {})[n] ? (STYLE[g.seat_styles[n]] || g.seat_styles[n]).toLowerCase() : '', (g.seat_models || {})[n] ? model(g.seat_models[n]) : '', (g.seat_efforts || {})[n] ? (EFFORT[g.seat_efforts[n]] || g.seat_efforts[n]).toLowerCase() + ' thinking' : ''].filter(Boolean).join(', '))}</small>` : ''}</span>`).join('')}</dd>
       <dt>Played by</dt><dd>${esc(model(g.model))}${g.effort ? `, ${esc((EFFORT[g.effort] || g.effort).toLowerCase())} thinking` : ''}${g.review_model && g.review ? `; reviewed by ${esc(model(g.review_model))}` : ''}</dd>
       <dt>Seed</dt><dd>${g.seed}</dd>
       <dt>Length</dt><dd>${g.minutes ? g.minutes + ' minutes' : 'unknown'}${g.usage ? `, ${g.usage.calls} turns` : ''}</dd>
-      ${g.usage ? `<dt>Usage</dt><dd>About $${g.usage.api_equivalent_usd} at API prices, covered by the subscription</dd>` : ''}</dl>`);
+      ${g.usage ? `<dt>Usage</dt><dd>About $${g.usage.api_equivalent_usd} at API prices, covered by the subscription</dd>` : ''}</dl>
+      <div class="setup-load"><button type="button" class="btn" data-load-setup>${ui('run', 16)}New run with this setup</button><span class="fine">Opens the New run page with this game's cards, rules and players filled in. Nothing starts until you press Start.</span></div>`);
     return `${open ? '' : `<div class="spoiler"><div><b>Spoilers are hidden.</b><span>The story and final scores are tucked away. Read the rounds in order, then reveal.</span></div><button class="btn" data-reveal="all">Reveal the whole game</button></div>`}
       ${secs.map((x) => `<details class="phase" id="${x.id}" ${G.open.has(G.tab + x.id) ? 'open' : ''}><summary class="phase-head"><span class="phase-ic">${ui(x.ic, 18)}</span><h2>${esc(x.label)}</h2>${x.hint ? `<span class="phase-hint">${esc(x.hint)}</span>` : ''}${ui('down', 18)}</summary>${x.html}</details>`).join('')}`;
   }
@@ -494,7 +495,7 @@
     const seen = (people) => Object.fromEntries(g.players.map((n) => [n, see(n) ? people[n] : { dead: people[n].dead }]));
 
     // the pool and the deal
-    const pool = `<div class="newcards">${rec.revealed.map((x) => {
+    const pool = `<div class="newcards">${rec.revealed.length ? '' : rec.flowers.map((f) => mcard(D.card[f] || { name: f }, 'in play')).join('')}${rec.revealed.map((x) => {
       if (x.hidden && !s) return `<div class="mcard facedown"><div class="mcard-art">${MeowIcons.svg('?', 'unknown')}</div><div class="mcard-name">Face-down</div><div class="mcard-kind">Hidden by the Lotus</div></div>`;
       return mcard(D.card[x.face] || { name: x.face }, x.hidden ? 'was face-down' : '');
     }).join('')}</div>
@@ -509,7 +510,7 @@
         <span class="pcard-role">${v ? esc(p.role) + (p.told !== p.role ? ` <small>thinks ${esc(p.told)}</small>` : '') : 'Secret'}</span>
         <span class="pcard-nest">${ui('eggs', 13)}${p.hand.length}</span></button>`;
     }).join('')}</div><p class="fine">${s ? 'Tap an animal to see its card.' : 'Each player knows only their own animal.'}</p>`;
-    add('pool', 'Pool', 'pool', `${plural(rec.revealed.length, 'new card')}`, pool);
+    add('pool', 'Pool', 'pool', rec.revealed.length ? `${plural(rec.revealed.length, 'new card')}` : `${plural(rec.pool.length, 'animal')}${rec.flowers.length ? ' · ' + rec.flowers.join(', ') : ''}`, pool);
     add('deal', 'Deal', 'deal', s ? 'Who was secretly what' : 'Secret', deal);
     if (rec.dusk) add('dusk', 'Dusk', 'dawn', 'Talk before the night', dayLog(g, rec.dusk, seen(start), see));
 
@@ -755,11 +756,51 @@
   const MODEL_NOTE = { haiku: 'Fast and light on usage. Misreads rules more often.', sonnet: 'Plays well. The usual choice.', opus: 'Sharper deduction. Heavy on usage.', fable: 'The strongest player. Heaviest on usage.' };
   const EFFORT_OPTS = [['', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Very high'], ['max', 'Maximum']];
   const EFFORT = Object.fromEntries(EFFORT_OPTS);
+  const STYLE_OPTS = [['', 'None'], ['team', 'Team first'], ['balanced', 'Balanced'], ['selfish', 'Out for themselves']];
+  const STYLE = Object.fromEntries(STYLE_OPTS);
   const blank = () => ({ kind: 'game', variant: '', players: null, rounds: null, seed: '', games: 500, model: 'sonnet', effort: '', review: 'opus', probes: true, human: '', opponents: 'claude', seats: {}, seatRounds: 'all', roles: null, flowers: null, startPool: [], reveals: [], rules: {}, raw: '' });
   let B = Object.assign(blank(), store.get('builder', {}));
   const R = { status: null, state: 'checking', cardTab: 'roles', q: '', go: false };
   const isPlay = () => B.kind === 'game' && seatNames().includes(B.human);
   const saveB = () => store.set('builder', B);
+  // Fill the run builder from a finished game: its cards, rules, table size, models and seat choices (not its seed).
+  function loadSetup(g) {
+    const b = blank();
+    b.variant = g.variant; b.players = g.players.length; b.rounds = (g.rounds || []).length || null;
+    if (MODELS.includes(g.model)) b.model = g.model;
+    b.effort = g.effort || ''; if ([...MODELS, 'none'].includes(g.review_model)) b.review = g.review_model;
+    const seat = (n) => (b.seats[n] = b.seats[n] || {});
+    for (const [n, m] of Object.entries(g.seat_models || {})) seat(n).model = m;
+    for (const [n, e] of Object.entries(g.seat_efforts || {})) seat(n).effort = e;
+    for (const [n, s] of Object.entries(g.seat_styles || {})) seat(n).style = s;
+    const base = (D.variants.find((v) => v.name === g.variant) || D.variants[0]).settings, raw = [], old = {};
+    for (const line of g.overrides || []) {
+      const i = line.indexOf('='); if (i < 0) continue;
+      const key = line.slice(0, i).trim(), text = line.slice(i + 1).trim();
+      let v;
+      try { v = JSON.parse(text.replace(/("(?:[^"\\]|\\.)*")\s*=/g, '$1:')); } catch { raw.push(line); continue; }
+      if (key === 'deck.roles') b.roles = v;
+      else if (key === 'deck.flowers') b.flowers = v;
+      else if (key === 'game.start_pool') old.pool = v;
+      else if (key === 'game.reveal_plan' || key === 'game.first_reveal') old.plan = v.flat();
+      else if (key === 'game.pool_reveal') old.reveal = v;
+      else if (key === 'scoring.goose') continue;
+      else if (key === 'game.seat_roles') for (const [n, r] of Object.entries(v)) seat(n).role = r;
+      else if (key === 'game.seat_sides') for (const [n, s] of Object.entries(v)) seat(n).side = s;
+      else if (key === 'game.seat_rounds') b.seatRounds = v;
+      else if (key === 'game.players' || key === 'game.rounds') continue;
+      else if (D.meta && (D.meta.settings || []).some((s) => s.key === key) && getPath(base, key) !== undefined) b.rules[key] = v;
+      else raw.push(line);
+    }
+    if (old.pool && old.reveal === 0) b.roles = old.pool;                 // a game from the reveal-three days
+    if (old.plan) { const fl = [...new Set(old.plan.filter((x) => (D.card[x] || {}).type === 'flower'))]; if (fl.length) { b.flowers = fl; b.rules['game.max_flowers'] = fl.length; } }
+    else if (old.reveal === 0) { b.flowers = []; }
+    b.raw = raw.join('\n');
+    B = b; saveB();
+    location.hash = '#/run';
+    toast('Setup loaded. Check it, then start the run.');
+  }
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-load-setup]') && G.game) loadSetup(G.game); });
   const variantOf = () => D.variants.find((v) => v.name === B.variant) || D.variants[0];
   const baseVal = (key) => getPath(variantOf().settings, key);
   const val = (key) => (key in B.rules ? B.rules[key] : baseVal(key));
@@ -776,10 +817,6 @@
   function overridesOf() {
     const out = [];
     for (const k of ['roles', 'flowers']) if (B[k] && !sameSet(B[k], variantOf().settings.deck[k])) out.push(`deck.${k}=${toml(B[k])}`);
-    if (B.startPool.length) out.push(`game.start_pool=${toml(B.startPool)}`);
-    const plan = B.reveals.slice(0, nRounds()).map((r) => (r || []).slice(0, val('game.pool_reveal')));
-    while (plan.length && !plan[plan.length - 1].length) plan.pop();
-    if (plan.length) out.push(`game.reveal_plan=${toml(plan)}`);
     const roles = {}, sides = {};
     for (const n of seatNames()) { const s = B.seats[n] || {}; if (s.role) roles[n] = s.role; if (s.side) sides[n] = s.side; }
     if (Object.keys(roles).length) out.push(`game.seat_roles=${tomlTable(roles)}`);
@@ -791,17 +828,18 @@
   }
   function payload() {
     const seat_models = {};
-    const seat_efforts = {};
+    const seat_efforts = {}, seat_styles = {};
+    for (const n of seatNames()) { const st = (B.seats[n] || {}).style; if (st) seat_styles[n] = st; }
     for (const n of seatNames()) { const m = (B.seats[n] || {}).model; if (m && m !== B.model) seat_models[n] = m; const e = (B.seats[n] || {}).effort; if (e && e !== B.effort) seat_efforts[n] = e; }
     const human = isPlay() ? B.human : null;
-    return { type: B.kind, variant: variantOf().name, players: nPlayers(), rounds: nRounds(), seed: B.seed === '' ? null : +B.seed, human, opponents: human && B.opponents === 'random' ? 'random' : 'claude', model: B.model, effort: B.effort || null, review_model: B.review, probes: B.probes, games: B.games, seat_models, seat_efforts, set: overridesOf() };
+    return { type: B.kind, variant: variantOf().name, players: nPlayers(), rounds: nRounds(), seed: B.seed === '' ? null : +B.seed, human, opponents: human && B.opponents === 'random' ? 'random' : 'claude', model: B.model, effort: B.effort || null, review_model: B.review, probes: B.probes, games: B.games, seat_models, seat_efforts, seat_styles, set: overridesOf() };
   }
   function command() {
     const p = payload(), q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
     let c = `python3 -m meowsim ${p.type === 'sim' ? 'sim --games ' + p.games : 'play --model ' + p.model} --variant ${q(p.variant)} --players ${p.players} --rounds ${p.rounds}`;
     if (p.seed !== null) c += ` --seed ${p.seed}`;
     if (p.human) c += ` --human ${p.human}` + (p.opponents === 'random' ? ' --seats random' : '');
-    if (p.type === 'game') { c += ` --review-model ${p.review_model}`; if (p.effort) c += ` --effort ${p.effort}`; if (!p.probes) c += ' --no-probes'; for (const [n, m] of Object.entries(p.seat_models)) c += ` --seat-model ${n}=${m}`; for (const [n, e] of Object.entries(p.seat_efforts)) c += ` --seat-effort ${n}=${e}`; }
+    if (p.type === 'game') { c += ` --review-model ${p.review_model}`; if (p.effort) c += ` --effort ${p.effort}`; if (!p.probes) c += ' --no-probes'; for (const [n, m] of Object.entries(p.seat_models)) c += ` --seat-model ${n}=${m}`; for (const [n, e] of Object.entries(p.seat_efforts)) c += ` --seat-effort ${n}=${e}`; for (const [n, st] of Object.entries(p.seat_styles)) c += ` --seat-style ${n}=${st}`; }
     for (const o of p.set) c += ` --set ${q(o)}`;
     return c;
   }
@@ -903,12 +941,13 @@
       const s = B.seats[n] || {};
       return `<div class="seatrow"><span class="seatrow-name"><span class="av s tok">${eggToken(i)}</span>${esc(n)}</span>
         ${B.kind === 'game' ? `<label class="mini"><span>Model</span><select data-seat-model="${esc(n)}"><option value="">Table's</option>${MODELS.map((m) => `<option value="${m}" ${s.model === m ? 'selected' : ''}>${MODEL[m]}</option>`).join('')}</select></label>
-        <label class="mini"><span>Thinking</span><select data-seat-effort="${esc(n)}">${EFFORT_OPTS.map(([k, l]) => `<option value="${k}" ${(s.effort || '') === k ? 'selected' : ''}>${k ? l : 'Table\'s'}</option>`).join('')}</select></label>` : ''}
+        <label class="mini"><span>Thinking</span><select data-seat-effort="${esc(n)}">${EFFORT_OPTS.map(([k, l]) => `<option value="${k}" ${(s.effort || '') === k ? 'selected' : ''}>${k ? l : 'Table\'s'}</option>`).join('')}</select></label>
+        <label class="mini"><span>Temperament</span><select data-seat-style="${esc(n)}">${STYLE_OPTS.map(([k, l]) => `<option value="${k}" ${(s.style || '') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
         <div class="mini"><span>Animal</span>${s.role ? `<span class="picked"><button type="button" class="cchip ${typeOf(s.role)}" data-pick="seat:${esc(n)}"><span class="cchip-art">${icon(s.role)}</span><span>${esc(s.role)}</span></button><button type="button" class="x" data-act="clear-seat" data-name="${esc(n)}" aria-label="Clear">${ui('close', 14)}</button></span>` : `<button type="button" class="add" data-pick="seat:${esc(n)}">Dealt at random</button>`}</div>
         <div class="mini"><span>Side</span><div class="seg small">${[['', 'Rolled'], ['Farm', 'Farm'], ['Meowfia', 'Cat']].map(([k, l]) => `<button type="button" class="${(s.side || '') === k ? 'on' : ''}" data-seat-side="${esc(n)}" data-value="${k}">${l}</button>`).join('')}</div></div></div>`;
     };
     const anyFixed = names.some((n) => (B.seats[n] || {}).role || (B.seats[n] || {}).side);
-    const nSet = names.filter((n) => { const x = B.seats[n] || {}; return x.role || x.side || (B.kind === 'game' && (x.model || x.effort)); }).length;
+    const nSet = names.filter((n) => { const x = B.seats[n] || {}; return x.role || x.side || (B.kind === 'game' && (x.model || x.effort || x.style)); }).length;
     box.innerHTML = `${secHead(3, 'The players', B.kind === 'game' ? 'Who plays, and anything you want to fix about a seat.' : 'Fix a seat\'s animal or side to test a matchup.')}
       ${isPlay() ? `<div class="frow"><div class="flabel"><b>Your seat</b><span>The others wait for you on your turn.</span></div><select data-bind="human" class="auto">${names.map((n) => `<option value="${n}" ${B.human === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div><div class="frow"><div class="flabel"><b>Your opponents</b><span>${B.opponents === 'random' ? 'Random bots answer at once and cost nothing. Good for learning the screens, not for a real game.' : 'Claude plays the other seats.'}</span></div><div class="seg">${[['claude', 'Claude'], ['random', 'Practice bots']].map(([k, l]) => `<button type="button" class="${B.opponents === k ? 'on' : ''}" data-set="opponents" data-value="${k}">${l}</button>`).join('')}</div></div>` : ''}
       ${B.kind === 'game' && !(isPlay() && B.opponents === 'random') ? `<div class="frow"><div class="flabel"><b>Model for the table</b><span>${MODEL_NOTE[B.model]}</span></div><div class="seg">${MODELS.map((m) => `<button type="button" class="${B.model === m ? 'on' : ''}" data-set="model" data-value="${m}">${MODEL[m]}</button>`).join('')}</div></div>
@@ -917,7 +956,7 @@
         <label class="fcell"><b>Review written by</b><select data-bind="review">${[...MODELS, 'none'].map((m) => `<option value="${m}" ${B.review === m ? 'selected' : ''}>${m === 'none' ? 'Nobody (skip)' : MODEL[m]}</option>`).join('')}</select></label>
         <div class="fcell wide"><div class="inline"><div><b>Ask who they suspect</b><span>One private question per player before each vote. It feeds the suspicion grid.</span></div>${toggle('probes', B.probes)}</div></div>
       </div>` : ''}
-      <details class="rgroup seatgroup" data-group="seats" ${nSet || store.get('rg-seats', false) ? 'open' : ''}><summary><div><b>Seat by seat</b><span>Give each seat its own model and thinking level, a chosen animal or a chosen side.</span></div>${nSet ? pill(nSet + ' set', 'yolk') : ''}${ui('down', 18)}</summary>
+      <details class="rgroup seatgroup" data-group="seats" ${nSet || store.get('rg-seats', false) ? 'open' : ''}><summary><div><b>Seat by seat</b><span>Give each seat its own model, thinking level and temperament, a chosen animal or a chosen side.</span></div>${nSet ? pill(nSet + ' set', 'yolk') : ''}${ui('down', 18)}</summary>
       <div class="seats">${names.map(seatRow).join('')}</div>
       ${anyFixed ? `<div class="frow slim"><div class="flabel"><b>Fixed seats apply</b></div><div class="seg small">${[['all', 'Every round'], ['first', 'Round 1 only']].map(([k, l]) => `<button type="button" class="${B.seatRounds === k ? 'on' : ''}" data-set="seatRounds" data-value="${k}">${l}</button>`).join('')}</div></div>` : ''}</details>`;
   }
@@ -927,17 +966,15 @@
   }
   function drawCards() {
     const k = R.cardTab, on = deckList(k), all = allOf(k), q = R.q.trim().toLowerCase();
-    const reveal = val('game.pool_reveal');
+    const nfl = Math.min(val('game.max_flowers'), deckList('flowers').length);
     const tiles = all.filter((n) => !q || n.toLowerCase().includes(q)).map((n) => `<button type="button" class="tog ${typeOf(n)}${on.includes(n) ? ' on' : ''}" data-hold data-card="${esc(n)}" data-tog="${esc(n)}" aria-pressed="${on.includes(n)}"><span class="tog-art">${icon(n)}</span><span class="tog-name">${esc(n)}</span><i class="tog-check">${ui('check', 12)}</i></button>`).join('');
-    $('#sec-cards').innerHTML = `${secHead(4, 'The cards', 'Which cards can turn up, and any you want to see for certain.')}
+    $('#sec-cards').innerHTML = `${secHead(4, 'The cards', 'The animals in the pool, and the flowers that can be in play.')}
       <div class="cardtools"><div class="seg" id="cardtab">${[['roles', 'Animals'], ['flowers', 'Flowers']].map(([x, l]) => `<button type="button" class="${k === x ? 'on' : ''}" data-cardtab="${x}">${l}<small>${deckList(x).length}/${allOf(x).length}</small></button>`).join('')}</div>
         <label class="search">${ui('search', 18)}<input type="search" id="tq" placeholder="Find a card" value="${esc(R.q)}" autocomplete="off" aria-label="Find a card"></label></div>
       <div class="quick">${(D.meta.setups || {}).testing ? `<button type="button" class="btn small" data-act="setup-testing" title="${esc(D.meta.setups.testing.help)}">Basics only</button>` : ''}<button type="button" class="link" data-act="deck-all">All on</button><button type="button" class="link" data-act="deck-none">All off</button>${k === 'roles' ? '<button type="button" class="link" data-act="deck-farm">Farm only</button><button type="button" class="link" data-act="deck-cats">Cats only</button>' : ''}${B[k] ? '<button type="button" class="link" data-act="deck-reset">Reset to the version</button>' : ''}<span class="fine">Tap to switch a card on or off. Hold it to read it.</span></div>
       <div class="toggrid" id="toggrid">${tiles || '<p class="muted">No cards match.</p>'}</div>
-      ${k === 'roles' ? '<p class="fine">The Pigeon and the House Cat are always in the pool.</p>' : ''}
-      <h3 class="sub">Guaranteed cards</h3>
-      ${slotRow('In the pool from the start', 'Animals available from round 1.', B.startPool, 'startPool', 12, 'roles')}
-      ${reveal > 0 ? Array.from({ length: nRounds() }, (_, i) => slotRow(`Revealed in round ${i + 1}`, i === 0 ? `Up to ${reveal}. The rest are drawn from the deck.` : '', (B.reveals[i] || []).slice(0, reveal), 'reveal:' + i, reveal, 'both')).join('') : ''}`;
+      ${k === 'roles' ? `<p class="fine">Every animal switched on is in the pool from the first round, and each player is dealt a different one at random. The Pigeon and the House Cat are always in the pool.</p>`
+    : `<div class="frow slim"><div class="flabel"><b>Flowers in play</b><span>${nfl ? `${nfl === 1 ? 'One' : nfl} of the ${on.length} switched on, picked at random when the game starts.` : 'No flowers in this game.'} A flower stays all game unless its card says to discard it.</span></div>${stepper('rule:game.max_flowers', val('game.max_flowers'), 0, 5)}</div>`}`;
   }
   function control(m) {
     const v = val(m.key), changed = m.key in B.rules && B.rules[m.key] !== baseVal(m.key);
@@ -1026,7 +1063,7 @@
           let next = Math.max(min, Math.min(max, Math.round((cur + dir * step) / step) * step));
           B.rules[rk] = m.kind === 'percent' ? next / 100 : next;
           if (B.rules[rk] === baseVal(rk)) delete B.rules[rk];
-          redrawRule(rk); if (rk === 'game.pool_reveal') drawCards();
+          redrawRule(rk); if (rk === 'game.max_flowers') drawCards();
         }
         saveB(); drawSummary(); return;
       }
@@ -1056,8 +1093,8 @@
         else if (a === 'deck-none') { B[k] = []; drawCards(); }
         else if (a === 'deck-farm' || a === 'deck-cats') { B.roles = allOf('roles').filter((n) => (D.card[n].type === 'farm') === (a === 'deck-farm')); drawCards(); }
         else if (a === 'deck-reset') { B[k] = null; drawCards(); }
-        else if (a === 'rule-reset') { delete B.rules[el.dataset.key]; redrawRule(el.dataset.key); if (el.dataset.key === 'game.pool_reveal') drawCards(); }
-        else if (a === 'setup-testing') { const s = D.meta.setups.testing; B.roles = [...s.roles]; B.flowers = [...s.flowers]; B.startPool = [...s.start_pool]; B.reveals = []; for (const [rk, v] of Object.entries(s.rules)) { if (v === baseVal(rk)) delete B.rules[rk]; else B.rules[rk] = v; } drawAll(); toast('Basics only: no flowers, and the simple animals.'); }
+        else if (a === 'rule-reset') { delete B.rules[el.dataset.key]; redrawRule(el.dataset.key); if (el.dataset.key === 'game.max_flowers') drawCards(); }
+        else if (a === 'setup-testing') { const s = D.meta.setups.testing; B.roles = [...s.roles]; B.flowers = [...s.flowers]; for (const [rk, v] of Object.entries(s.rules)) { if (v === baseVal(rk)) delete B.rules[rk]; else B.rules[rk] = v; } drawAll(); toast('Basics only: no flowers, and the simple animals.'); }
         else if (a === 'reset') { B = Object.assign(blank(), { variant: D.variants[0].name }); R.q = ''; drawAll(); toast('Back to the standard setup.'); }
         else if (a === 'copy') { try { await navigator.clipboard.writeText(command()); toast('Command copied. Run it in sim/ on the PC.'); } catch { openSheet(`<h2>Command</h2><p class="fine">Run it in the sim folder on the PC.</p><pre class="code">${esc(command())}</pre>`, 'Command'); } return; }
         else if (a === 'start') { start(el); return; }
@@ -1069,6 +1106,7 @@
       const t = e.target;
       if (t.dataset.bind) { B[t.dataset.bind] = t.value; if (t.dataset.bind === 'human') drawPlayers(); }
       else if (t.dataset.seatModel) { const n = t.dataset.seatModel; B.seats[n] = { ...(B.seats[n] || {}), model: t.value }; }
+      else if (t.dataset.seatStyle) { const n = t.dataset.seatStyle; B.seats[n] = { ...(B.seats[n] || {}), style: t.value }; }
       else if (t.dataset.seatEffort) { const n = t.dataset.seatEffort; B.seats[n] = { ...(B.seats[n] || {}), effort: t.value }; }
       else if (t.dataset.rule) { const rk = t.dataset.rule; B.rules[rk] = t.value; if (B.rules[rk] === baseVal(rk)) delete B.rules[rk]; redrawRule(rk); }
       else return;
