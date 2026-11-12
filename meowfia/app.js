@@ -575,36 +575,15 @@
   $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet' || e.target.closest('[data-close]')) closeSheet(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
-  async function latestSim() {
-    if (D.sim !== null) return D.sim;
-    D.sim = false;
-    if (D.sims.length) { try { D.sim = await getData(`sims/${D.sims[0].id}.json`); } catch { /* none */ } }
-    return D.sim;
-  }
   const kindLine = (c) => (c.type === 'flower' ? `Flower · ${c.group}` : `${c.team} · ${D.cards.abilities[c.ability] || ''}`);
-  async function openCard(name) {
+  function openCard(name) {
     const c = D.card[name]; if (!c) return;
-    const seen = D.games.reduce((n, g) => n + g.rounds.filter((r) => (r.revealed || []).includes(name)).length, 0);
-    const stat = (v, l) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`;
-    const body = (stats, foot = '') => `<div class="bigcard ${c.type}"><div class="bigcard-art" style="background:${MeowIcons.bg(name)}">${icon(name)}</div>
+    openSheet(`<div class="bigcard ${c.type}"><div class="bigcard-art" style="background:${MeowIcons.bg(name)}">${icon(name)}</div>
         <div class="bigcard-text"><div class="bigcard-kind">${c.type === 'flower' ? ui('flower', 14) : ui(c.ability, 14)}${esc(kindLine(c))}</div><h2>${esc(name)}</h2><p>${esc(c.text)}</p>
         <div class="pills">${c.buffer ? pill('Always in the pool', 'yolk') : ''}${c.implemented === false ? pill('Not simulated yet', 'muted') : ''}</div></div></div>
       ${c.reading ? `<h4>How the simulator reads it</h4><p>${esc(c.reading)}</p>` : ''}
       ${c.note ? `<h4>At a text table</h4><p>${esc(c.note)}</p>` : ''}
-      ${c.type !== 'flower' ? `<h4>When it acts at night</h4>${c.tiers && c.tiers.length ? `<div class="pills">${c.tiers.map((t) => pill(esc(t.name))).join('')}</div>` : '<p>It has no night effect of its own.</p>'}` : ''}
-      <h4>In play</h4><div class="stats" id="cardstats">${stats}</div>${foot}`;
-    openSheet(body(stat(seen, 'times revealed in real games')), name, 'card-sheet');
-    const sim = await latestSim();
-    const box = $('#cardstats');
-    if (!sim || !box || $('.bigcard h2').textContent !== name) return;
-    let st = stat(seen, 'times revealed in real games');
-    if (c.type === 'flower') { const f = sim.flowers.find((x) => x.name === name); st += stat(f ? pct(f.share, 1) : '0%', 'of simulated rounds had it'); }
-    else {
-      const r = sim.roles.find((x) => x.name === name);
-      if (r && r.dealt) st += stat(pct(r.effect_rate), 'of nights it did something') + stat(pct(r.blocked_rate), 'of nights it was hugged') + stat(r.eggs_moved, 'eggs moved per night') + stat(r.dealt, `times dealt in ${sim.games} simulated games`);
-    }
-    box.innerHTML = st;
-    box.insertAdjacentHTML('afterend', `<p class="fine">Simulation figures come from random bots playing ${esc(sim.variant)}: they show what the card does, not how well people use it.</p>`);
+      ${c.type !== 'flower' ? `<h4>When it acts at night</h4>${c.tiers && c.tiers.length ? `<div class="pills">${c.tiers.map((t) => pill(esc(t.name))).join('')}</div>` : '<p>It has no night effect of its own.</p>'}` : ''}`, name, 'card-sheet');
   }
   // Tap a card to inspect it. Where a tap already means something else (the run builder's toggles), hold it.
   let press = null, swallow = false;
