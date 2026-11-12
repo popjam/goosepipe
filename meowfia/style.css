@@ -911,3 +911,54 @@ select.auto { width: auto; min-width: 170px; max-width: 100%; }
 
 .seg.shake { display: flex; }
 .seg.shake button { flex: 1; min-height: 44px; }
+
+/* game health */
+.page-head.withlink { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 2px; align-content: start; }
+.tile b { font: 700 26px/1.1 var(--display); letter-spacing: -.02em; }
+.tile span { font-size: 13.5px; color: var(--ink-2); }
+.tile small { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+.wbars { display: grid; gap: 7px; }
+.wbar { display: grid; grid-template-columns: 92px 1fr 44px; align-items: center; gap: 10px; font-size: 14px; }
+.wbar span { display: flex; align-items: center; gap: 7px; }
+.wbar i { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+.wbar u { display: block; height: 100%; background: var(--ink-2); border-radius: 0 4px 4px 0; }
+.wbar b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.talks { display: grid; gap: 12px; margin-top: 10px; }
+.talk { border-top: 1px solid var(--line); padding-top: 10px; }
+.talk > b { display: flex; align-items: center; gap: 7px; }
+.talk dl { display: grid; grid-template-columns: 1fr; gap: 2px 12px; margin-top: 6px; }
+.talk dt { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin-top: 6px; }
+.talk dd { margin: 0; color: var(--ink-2); }
+.sparks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 12px; }
+.sparkbox { margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.sparkbox figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sparkbox figcaption b { font-size: 14px; }
+.sparkbox figcaption span { font: 700 18px/1 var(--display); }
+.sparkbox small { color: var(--ink-3); font-size: 12px; }
+.spark { width: 100%; height: auto; display: block; margin: 4px 0 2px; overflow: visible; }
+.sp-base { stroke: var(--line); stroke-width: 1; }
+.sp-mark { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 3 3; }
+.sp-line { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.sp-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 2; }
+.sp-hit { fill: transparent; cursor: pointer; }
+.sp-tip { position: absolute; z-index: 30; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 5px 9px; border-radius: 8px; pointer-events: none; max-width: 260px; }
+.issue { border-top: 1px solid var(--line); padding: 8px 0; }
+.issue summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; min-height: 40px; }
+.issue summary::-webkit-details-marker { display: none; }
+.issue summary .ui:last-child { margin-left: auto; color: var(--ink-3); transition: transform .15s; }
+.issue[open] summary .ui:last-child { transform: rotate(180deg); }
+.issue .notes { margin-top: 6px; }
+.issue .notes a { white-space: nowrap; font-size: 13px; }
+.cchip.plain { background: var(--surface-2); }
+.changes { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.changes li { display: grid; grid-template-columns: 78px 1fr; gap: 12px; }
+.changes time { color: var(--ink-3); font-size: 13px; padding-top: 2px; }
+.changes p { margin: 2px 0 4px; color: var(--ink-2); }
+.changes a { font-size: 13.5px; }
+@media (min-width: 720px) { .talk dl { grid-template-columns: 150px 1fr; } .talk dt { margin-top: 2px; } }
+
+.data.who th:nth-child(-n+3), .data.who td:nth-child(-n+3) { text-align: left; }
+
+.c-opt.off { opacity: .55; cursor: default; }

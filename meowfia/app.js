@@ -165,7 +165,7 @@
     const parts = path.split('/').map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
     let view = parts[0] || 'games';
     if (view === 'new') view = 'run';
-    const section = { game: 'games', sim: 'sims', play: 'run' }[view] || view;
+    const section = { game: 'games', health: 'games', sim: 'sims', play: 'run' }[view] || view;
     $$('[data-nav]').forEach((a) => { const on = a.dataset.nav === section; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     stopPolling(); closeSheet();
     if (view !== 'play') leavePlay();
@@ -177,6 +177,7 @@
     if (view === 'game') return viewGame(parts[1], parts[2]);
     if (view === 'cards') return viewCards(parts[1]);
     if (view === 'rules') return viewRules(parts[1]);
+    if (view === 'health') return viewHealth();
     if (view === 'sims') return viewSims();
     if (view === 'sim') return viewSim(parts[1]);
     if (view === 'run') return viewRun(new URLSearchParams(query));
@@ -245,7 +246,7 @@
       <div class="grow-tags">${tags.map((t) => `<button type="button" class="pill tag${tags.indexOf(t) >= tags.length - gameChanges(g).length ? ' yolk' : ''}${GL.tags.includes(t) ? ' on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div></article>`;
   }
   function viewGames() {
-    page(`<header class="page-head"><h1>Games</h1></header>
+    page(`<header class="page-head withlink"><h1>Games</h1><a class="btn small" href="#/health">${ui('scores', 14)}Game health</a></header>
       ${D.games.length ? `<div class="gfilter"><label class="search">${ui('search', 18)}<input type="search" id="gq" placeholder="Search titles, tags, animals or players" value="${esc(GL.q)}" autocomplete="off" aria-label="Search games"></label><div class="gactive" id="gactive"></div></div><div class="gdays" id="glist"></div>` : `<div class="empty"><b>No games yet.</b><span>Start the first one from the run page.</span><a class="btn primary" href="#/run">New run</a></div>`}`);
     if (!D.games.length) return;
     const draw = () => {
@@ -363,9 +364,32 @@
     }).join('')}</div>`);
     if (open && rv && rv.scores) add('review', 'Review', 'minds', REVIEW.filter((k) => rv.scores[k] !== undefined).sort((x, y) => rv.scores[y] - rv.scores[x]).slice(0, 3).map((k) => `${cap(k)} ${rv.scores[k]}`).join(' · '), meters(rv.scores));
     if (open && rv) {
-      const dn = rv.design_notes || [], cf = rv.confusions || [];
-      add('notes', 'Notes', 'info', `${dn.length} for the designer · ${plural(cf.length, 'misread rule')}`, `<div class="cols">${listBlock('Notes for the designer', dn.map(esc), 'None.')}
-        ${listBlock('Rules players misread', cf.map((x) => `<b>${esc(x.player)}, round ${x.round}.</b> ${esc(x.what)}`), 'Nobody misread anything.')}</div>`);
+      const good = rv.worked || [], bad = [...(rv.problems || []), ...(rv.design_notes || [])], cf = rv.confusions || [];
+      const talks = Object.entries(g.interviews || {});
+      const ASK = [['fun', 'Enjoyed most'], ['confusing', 'Found confusing'], ['change', 'Would change'], ['regret', 'Would take back']];
+      add('notes', 'Notes', 'info', `${good.length} worked · ${bad.length} to fix · ${plural(cf.length, 'misread rule')}`, `<div class="cols">${listBlock('What worked', good.map(esc), 'Nothing was singled out.')}
+        ${listBlock('What to fix', bad.map(esc), 'Nothing was singled out.')}</div>
+        ${listBlock('Rules players misread', cf.map((x) => `<b>${esc(x.player)}, round ${x.round}.</b> ${esc(x.what)}`), 'Nobody misread anything.')}
+        ${talks.length ? `<section class="block"><h3>What the players said afterwards</h3><p class="fine">Each player was shown the hidden roles and asked four questions.</p><div class="talks">${talks.map(([n, t]) => `<div class="talk"><b>${dot(g, n)}${esc(n)}</b><dl>${ASK.filter(([k]) => t[k]).map(([k, l]) => `<dt>${l}</dt><dd>${esc(t[k])}</dd>`).join('')}</dl></div>`).join('')}</div></section>` : ''}`);
+    }
+    if (open && g.health) {
+      const h = g.health, sm = h.summary, yes = (b) => (b ? ui('check', 14) : '<span class="muted">–</span>');
+      const tile = (v, label, sub) => `<div class="tile"><b>${v}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+      const max = Math.max(1, ...Object.values(h.talk.words));
+      add('health', 'Health', 'scores', [sm.vote_share !== null ? `${sm.vote_share}% of votes on target` : '', h.surveyed ? `${sm.lies_caught} of ${plural(sm.lies, 'lie')} caught` : ''].filter(Boolean).join(' · '), `
+        <div class="tiles">
+          ${tile(sm.vote_share === null ? '–' : sm.vote_share + '%', 'of votes on the player who went out', 'Near 100% means a pile-on; near 50% a real contest.')}
+          ${tile(sm.named_at === null ? '–' : sm.named_at + '%', 'of the day gone when they were first named', 'Low means the table settled almost at once.')}
+          ${tile(h.surveyed ? `${sm.lies_caught} of ${sm.lies}` : '–', 'false animal claims that ended in an eggsecution', h.surveyed ? 'From what each player said they had claimed.' : 'Needs the pre-vote survey.')}
+          ${tile(sm.fired === null ? '–' : sm.fired + '%', 'of animals whose ability did something', '')}
+          ${tile(h.spread.gap, 'points between first and last', h.spread.early_leader_won === null ? '' : h.spread.early_leader_won ? 'The leader after round 1 won.' : 'The leader after round 1 did not win.')}
+          ${tile(h.talk.messages ? Math.round(100 * h.talk.questions / h.talk.messages) + '%' : '–', 'of messages asked a question', `${h.talk.messages} messages, ${h.talk.total} words`)}
+        </div>
+        <section class="block"><h3>Who did the talking</h3><div class="wbars">${g.players.map((n) => `<div class="wbar"><span>${dot(g, n)}${esc(n)}</span><i><u style="width:${Math.round(100 * h.talk.words[n] / max)}%"></u></i><b>${h.talk.words[n]}</b></div>`).join('')}</div><p class="fine">Words spoken aloud over the whole game.</p></section>
+        <section class="block"><h3>What each animal did</h3><div class="scroll-x"><table class="data who"><thead><tr><th>Round</th><th>Player</th><th>Animal</th><th>Did something</th><th>Reached another player</th><th>Won the round</th></tr></thead><tbody>
+          ${h.cards.map((c) => `<tr><td>${c.round}</td><td>${esc(c.player)}</td><td>${cchip(c.name)}</td><td>${yes(c.fired)}</td><td>${yes(c.reached)}</td><td>${yes(c.won)}</td></tr>`).join('')}</tbody></table></div>
+          <p class="fine">"Did something": the ability produced any effect at night, even just telling its holder something. "Reached another player": it changed another player's nest, state or animal.</p></section>
+        ${h.lies.length ? `<section class="block"><h3>False claims</h3><ul class="notes">${h.lies.map((x) => `<li><b>${esc(x.player)}, round ${x.round}.</b> Claimed the ${esc(x.claimed)}, was the ${esc(x.was)}. ${x.caught ? 'Eggsecuted.' : 'Got away with it.'}${x.suspicion === null ? '' : ` The table had them at ${x.suspicion}% likely Meowfia.`}</li>`).join('')}</ul></section>` : ''}`);
     }
     const ov = (g.overrides || []).map(describe).filter(Boolean);
     add('setup', 'Setup', 'run', gameChanges(g).join(' · ') || 'Standard game', `<dl class="facts">
@@ -720,6 +744,49 @@
     ['mean_egg_change', 'Eggs gained per player per night', 'n'], ['night_deaths_per_round', 'Night deaths per round', 'n'], ['day_deaths_per_round', 'Day deaths per round', 'n'],
     ['hugs_per_night', 'Hugs per night', 'n'], ['confusions_per_night', 'Confusions per night', 'n'], ['players_changing_animal_per_round', 'Animal changes per round', 'n'],
     ['players_changing_alignment_per_round', 'Side changes per round', 'n'], ['redirects_per_night', 'Redirected visits per night', 'n'], ['games_ended_early', 'Games cut short by the deck', 'n']];
+  /* ================= game health: every game together ================= */
+  const TREND = [['fun', 'Fun', 10, 'Reviewer, out of 10'], ['tension', 'Tension', 10, 'Reviewer, out of 10'], ['deduction', 'Deduction', 10, 'Reviewer, out of 10'], ['bluffing', 'Bluffing', 10, 'Reviewer, out of 10'], ['clarity', 'Clarity', 10, 'Reviewer, out of 10'],
+    ['vote_share', 'Votes on the target', 100, '% of votes on the player who went out'], ['named_at', 'When the target was named', 100, '% of the day gone'], ['liecatch', 'Lies caught', 100, '% of false claims that ended in an eggsecution'],
+    ['fired', 'Animals that did something', 100, '% of animals dealt'], ['gap', 'Score gap', 0, 'Points between first and last'], ['top_share', 'Loudest player', 100, '% of all words'], ['questions', 'Questions asked', 100, '% of messages']];
+  // One measure over the games in order: a thin line, a dot per game, a dashed rule where the rules changed.
+  function spark(rows, key, top, marks) {
+    const W = 300, H = 84, px = 8, py = 10, vals = rows.map((r) => r[key]), known = vals.filter((v) => v !== null && v !== undefined);
+    if (!known.length) return '<p class="muted">No data yet.</p>';
+    const hi = top || Math.max(1, ...known), x = (i) => (rows.length < 2 ? W / 2 : px + i * (W - 2 * px) / (rows.length - 1)), y = (v) => H - py - (v / hi) * (H - 2 * py);
+    let d = '', pen = false;
+    vals.forEach((v, i) => { if (v === null || v === undefined) { pen = false; return; } d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`; pen = true; });
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(key)} over ${rows.length} games"><line x1="0" x2="${W}" y1="${H - py}" y2="${H - py}" class="sp-base"/>
+      ${marks.map((i) => `<line x1="${x(i).toFixed(1)}" x2="${x(i).toFixed(1)}" y1="2" y2="${H - py}" class="sp-mark"/>`).join('')}
+      <path d="${d}" class="sp-line"/>
+      ${vals.map((v, i) => (v === null || v === undefined ? '' : `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" class="sp-dot"/><circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="13" class="sp-hit" data-tip="${esc(rows[i].title)}: ${v}" data-go="${esc(rows[i].id)}"/>`)).join('')}</svg>`;
+  }
+  async function viewHealth() {
+    document.title = 'Game health · Meowfia Lab';
+    page('<div class="loading" role="status">Adding up the games</div>');
+    let h; try { h = await getData('health.json'); } catch { page('<div class="empty"><b>No health figures yet.</b><span>They are worked out when the site is published.</span><a class="btn" href="#/">Back to the games</a></div>'); return; }
+    const rows = h.trend.map((r) => ({ ...r, liecatch: r.lies ? Math.round(100 * r.lies_caught / r.lies) : null }));
+    const idx = Object.fromEntries(rows.map((r, i) => [r.id, i]));
+    const marks = [...new Set(h.changes.filter((c) => c.game in idx).map((c) => idx[c.game]))];
+    const pct = (a, b) => (b ? Math.round(100 * a / b) + '%' : '–');
+    const group = (title, list, empty) => `<section class="block"><h3>${title}</h3>${list.length ? list.map((x) => `<details class="issue"><summary>${x.about === 'General' ? '<span class="cchip plain"><span>General</span></span>' : `<span class="cchip ${typeOf(x.about)}"><span class="cchip-art">${icon(x.about)}</span><span>${esc(x.about)}</span></span>`}<b>${plural(x.count, 'note')}</b><span class="muted">in ${plural(x.games, 'game')}</span>${ui('down', 16)}</summary><ul class="notes">${x.items.map((n) => `<li>${esc(n.text)} <a href="#/game/${encodeURIComponent(n.game)}">${esc(n.title)}</a></li>`).join('')}</ul></details>`).join('') : `<p class="muted">${empty}</p>`}</section>`;
+    page(`<a class="crumb" href="#/">${ui('back', 16)}Games</a>
+      <header class="page-head"><h1>Game health</h1><p>Every finished game added together: how the measures move as the rules change, what each card does, and what keeps coming up. ${plural(rows.length, 'game')} so far, so read single dots as anecdotes.</p></header>
+      <section class="block"><h3>Over time</h3><p class="fine">One dot per game, oldest on the left. A dashed line marks the first game after a rule change. Tap a dot for the game.</p>
+        <div class="sparks">${TREND.map(([k, label, top, note]) => { const last = [...rows].reverse().find((r) => r[k] !== null && r[k] !== undefined); return `<figure class="sparkbox"><figcaption><b>${label}</b><span>${last ? last[k] + (top === 100 ? '%' : '') : '–'}</span></figcaption>${spark(rows, k, top, marks)}<small>${note}</small></figure>`; }).join('')}</div>
+        <div class="sp-tip" id="sptip" hidden></div>
+        <details class="issue"><summary><b>The numbers</b>${ui('down', 16)}</summary><div class="scroll-x"><table class="data"><thead><tr><th>Game</th>${TREND.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${[...rows].reverse().map((r) => `<tr><td><a href="#/game/${encodeURIComponent(r.id)}">${esc(r.title)}</a></td>${TREND.map(([k]) => `<td>${r[k] ?? '–'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details></section>
+      <section class="block"><h3>What each animal does</h3><div class="scroll-x"><table class="data"><thead><tr><th>Animal</th><th>Dealt</th><th>Games</th><th>Did something</th><th>Reached another player</th><th>Holder won the round</th></tr></thead><tbody>
+        ${h.cards.map((c) => `<tr><td>${cchip(c.name)}</td><td>${c.dealt}</td><td>${c.games}</td><td>${pct(c.fired, c.dealt)}</td><td>${pct(c.reached, c.dealt)}</td><td>${pct(c.won, c.dealt)}</td></tr>`).join('')}</tbody></table></div>
+        <p class="fine">Animals never dealt are not listed. A few deals say little: look at the "Dealt" column first.</p>
+        ${h.flowers.length ? `<h4 class="sub">Flowers that have been in play</h4><div class="pills">${h.flowers.map((f) => cchip(f.name, ` <small>${plural(f.games, 'game')}</small>`)).join('')}</div>` : ''}</section>
+      <div class="cols">${group('What keeps needing a fix', h.issues, 'No notes yet.')}${group('What keeps working', h.worked || [], 'Nothing has been singled out yet.')}</div>
+      <section class="block"><h3>Rule changes</h3>${h.changes.length ? `<ol class="changes">${h.changes.map((c) => `<li><time>${esc(when(c.date, true))}</time><div><b>${esc(c.title)}</b><p>${esc(c.detail)}</p>${c.game ? `<a href="#/game/${encodeURIComponent(c.game)}">First game on it: ${esc(c.game_title)}</a>` : '<span class="muted">No game played on it yet.</span>'}</div></li>`).join('')}</ol>` : '<p class="muted">No changes logged.</p>'}</section>`);
+    const tip = $('#sptip');
+    app.onpointerover = (e) => { const t = e.target.closest('.sp-hit'); if (!t || !tip) return; tip.textContent = t.dataset.tip; tip.hidden = false; const r = t.getBoundingClientRect(); tip.style.left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, r.left + r.width / 2 - tip.offsetWidth / 2)) + 'px'; tip.style.top = (r.top + window.scrollY - tip.offsetHeight - 6) + 'px'; };
+    app.onpointerout = (e) => { if (e.target.closest('.sp-hit') && tip) tip.hidden = true; };
+    app.onclick = (e) => { const t = e.target.closest('.sp-hit'); if (t) location.hash = '#/game/' + encodeURIComponent(t.dataset.go); };
+  }
+
   function viewSims() {
     page(`<header class="page-head"><h1>Simulations</h1><p>Hundreds of games played by random bots in seconds. They show how the rules behave, not how people play: how often an ability matters, how big nests grow, how often nobody is Meowfia.</p></header>
       ${D.sims.length ? `<div class="glist">${D.sims.map((s) => `<a class="gcard" href="#/sim/${encodeURIComponent(s.id)}"><div class="gcard-meta"><span>${when(s.started, true)}</span><span>${esc(s.variant)}</span><span>${s.players} players</span>${changesPill(s.overrides)}</div>
@@ -1415,7 +1482,9 @@
       const limit = (f.say || {}).words || 80, n = words(u.say), acts = (f.special || {}).actions || [];
       const noise = /Banksia/.test(pd.prompt);
       const tags = (u.caw ? '<button type="button" class="c-tag" data-caw>CAW CAW<b>×</b></button>' : '') + (u.act ? `<button type="button" class="c-tag" data-action="${u.act}">${esc(ACTION[u.act][0])}<b>×</b></button>` : '') + (u.wopen ? '<button type="button" class="c-tag" data-wopen>Whisper<b>×</b></button>' : '');
-      if (u.more) h += `<div class="c-more"><button type="button" class="c-opt${u.caw ? ' on' : ''}" data-caw><b>CAW CAW</b><span>Ask to end the talk and vote. It takes ${r.day.caw_caw_needed} players.</span></button>
+      const kunzeaGone = (s.flowers || []).includes('Crimson Kunzea') && !acts.includes('double_down');
+      if (u.more) h += `<div class="c-more">${f.caw ? `<button type="button" class="c-opt${u.caw ? ' on' : ''}" data-caw><b>CAW CAW</b><span>Ask to end the talk and vote. It takes ${r.day.caw_caw_needed} players.</span></button>` : `<button type="button" class="c-opt off" disabled><b>CAW CAW</b><span>${liveTurn(pd) ? 'Not open yet: it opens once the talk is half over.' : 'Not available right now.'}</span></button>`}
+        ${kunzeaGone ? '<button type="button" class="c-opt off" disabled><b>Double down</b><span>Crimson Kunzea: only before your first message of the day, and only once a round.</span></button>' : ''}
         ${f.whisper ? `<button type="button" class="c-opt${u.wopen ? ' on' : ''}" data-wopen><b>Whisper</b><span>Say something only one player hears.</span></button>` : ''}
         ${acts.map((a) => `<button type="button" class="c-opt${u.act === a ? ' on' : ''}" data-action="${a}"><b>${esc(ACTION[a][0])}</b><span>${esc(ACTION[a][1])}</span></button>`).join('')}</div>`;
       if (f.whisper && u.wopen) h += `<div class="t-extra"><select data-wto><option value="">Whisper to…</option>${f.whisper.options.map((n2) => `<option ${u.wto === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select><input type="text" id="twtext" placeholder="Only they will hear this" value="${esc(u.wtext)}" autocomplete="off"></div>`;
@@ -1525,7 +1594,11 @@
       if ((el = t.closest('#tsend'))) {
         if (!turnValid(pd, u)) return;
         const limit = (f.say || {}).words || 80;
-        const say = u.say.trim().split(/\s+/).slice(0, limit).join(' ');
+        let say = u.say.trim().split(/\s+/).slice(0, limit).join(' ');
+        if (pd.kind === 'day' && /\bcaw\W+caw\b/i.test(say)) {
+          if (f.caw) { u.caw = true; say = say.replace(/\W*\bcaw\W+caw\b\W*/ig, ' ').trim(); }
+          else { toast(liveTurn(pd) ? 'CAW CAW is not open yet: it opens once the talk is half over.' : 'CAW CAW cannot be called right now.', true); return; }
+        }
         const action = { targets: u.targets, role: u.role, number: f.number ? u.number : null, cards: u.cards, say, caw: u.caw, note: '',
           whisper: u.wto && u.wtext.trim() ? { to: [u.wto], text: u.wtext.trim() } : null,
           special: u.act ? { action: u.act, player: u.aplayer || null, animal: u.aanimal || null, guesses: Object.entries(u.guesses).map(([player, animal]) => ({ player, animal })) } : null };
