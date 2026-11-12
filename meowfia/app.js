@@ -1289,7 +1289,7 @@
   /* ----- your move ----- */
   const blankTurn = () => ({ targets: [], role: null, number: null, cards: [], say: '', caw: false, more: false, wopen: false, wto: '', wtext: '', act: '', aplayer: '', aanimal: '', guesses: {} });
   const TARGET_LABELS = { Gecko: ['Copy whose animal?', 'then use it on whom?'], Copycat: ['Copy whose animal?', 'then use it on whom?'], 'Rag Doll': ['Visit whom?', 'then send them where?'], 'Cat Burgler': ['Steal from whom?', 'then who gets the eggs?'] };
-  const ACTION = { wink: ['Wink', 'They die at once. Nobody is told it was you.'], bond: ['Handshake', 'Golden Wattle: bond with a player.'], touch: ['Touch', 'Stinging Bush: they die.'], sunflower: ['Sunflower', 'Spend an egg to learn if a player is a certain animal.'], challenge: ['Challenge', 'Guess every animal. Right: you win alone. Wrong: you die.'], double_down: ['Double down', 'Crimson Kunzea: double your score this round.'] };
+  const ACTION = { wink: ['Wink', 'They die at once. Nobody is told it was you.'], bond: ['Handshake', 'Golden Wattle: bond with a player.'], touch: ['Touch', 'Stinging Bush: they die.'], sunflower: ['Sunflower', 'Spend an egg to learn if a player is a certain animal.'], challenge: ['Challenge', 'Guess every animal. Right: you win alone. Wrong: you die.'], double_down: ['Double down', 'Crimson Kunzea: throw your vote now and double your score this round.'] };
   function words(s) { return s.trim() ? s.trim().split(/\s+/).length : 0; }
   const liveTurn = (pd) => !!((pd || {}).meta || {}).live;
   function turnValid(pd, u) {
@@ -1300,6 +1300,7 @@
     if (f.cards && pd.kind !== 'day' && (u.cards.length < f.cards.min || u.cards.length > f.cards.max)) return false;
     if (pd.kind === 'day' && u.act) {
       if (['wink', 'bond', 'touch', 'sunflower'].includes(u.act) && !u.aplayer) return false;
+      if (u.act === 'double_down' && f.special.pledge && (!u.aplayer || u.cards.length < Math.max(1, f.special.pledge.min) || u.cards.length > f.special.pledge.max)) return false;
       if (u.act === 'sunflower' && (!u.aanimal || u.cards.length !== 1)) return false;
       if (u.act === 'challenge' && f.special.players.some((p) => !u.guesses[p])) return false;
     }
@@ -1358,8 +1359,10 @@
       if (u.act) {
         const sp = f.special;
         h += '<div class="t-extra col">';
-        if (['wink', 'bond', 'touch', 'sunflower'].includes(u.act)) h += `<select data-aplayer><option value="">${esc(ACTION[u.act][0])}: choose a player…</option>${sp.players.map((n2) => `<option ${u.aplayer === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select>`;
+        const early = u.act === 'double_down' && sp.pledge;
+        if (['wink', 'bond', 'touch', 'sunflower'].includes(u.act) || early) h += `<select data-aplayer><option value="">${esc(ACTION[u.act][0])}: choose a player…</option>${sp.players.map((n2) => `<option ${u.aplayer === n2 ? 'selected' : ''}>${esc(n2)}</option>`).join('')}</select>`;
         if (u.act === 'sunflower') h += animalSelect('data-aanimal', s.pool, u.aanimal, 'Are they the…') + cardPick(pd, u, 'Egg to spend');
+        if (early) h += cardPick(pd, u, 'Eggs you throw now, as your vote');
         if (u.act === 'challenge') h += `<div class="t-guess">${sp.players.map((n2) => `<label><span>${esc(n2)}</span>${animalSelect(`data-guess="${esc(n2)}"`, s.pool, u.guesses[n2], 'is the…')}</label>`).join('')}</div>${f.cards ? cardPick(pd, u, 'Your bet') : ''}`;
         h += '</div>';
       }
@@ -1440,7 +1443,7 @@
         return redraw();
       }
       if ((el = t.closest('[data-egg]'))) {
-        const id = el.dataset.egg, max = pd.kind === 'day' && u.act === 'sunflower' ? 1 : f.cards.max;
+        const id = el.dataset.egg, max = pd.kind === 'day' && u.act === 'sunflower' ? 1 : pd.kind === 'day' && u.act === 'double_down' && f.special.pledge ? f.special.pledge.max : f.cards.max;
         if (u.cards.includes(id)) u.cards = u.cards.filter((x) => x !== id);
         else if (max === 1) u.cards = [id];
         else if (u.cards.length < max) u.cards.push(id);
