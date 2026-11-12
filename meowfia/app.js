@@ -401,7 +401,7 @@
     let h = '';
     const thought = (e, who) => (e.note && canSee(who) ? `<div class="thought"><i>thinks</i>${esc(e.note)}</div>` : '');
     for (const e of entries) {
-      if (e.k === 'beat') h += `<div class="beat"><span>${esc(e.label)} · ${e.n} of ${e.of}</span></div>`;
+      if (e.k === 'beat') h += `<div class="beat"><span>${esc(e.label)} · ${e.live ? 'open discussion' : `${e.n} of ${e.of}`}</span></div>`;
       else if (e.k === 'system') { if (!e.text.startsWith('Nest sizes:')) h += `<div class="sys">${esc(e.text)}</div>`; }
       else if (e.k === 'say') {
         const hide = e.anon && !canSee(e.p);
@@ -940,7 +940,7 @@
     side.innerHTML = `<div class="sum"><h3>Your run</h3><dl class="facts tight">${summaryLines().map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       ${ch.length ? `<h4>${plural(ch.length, 'change')} from the standard game</h4><ul class="plain sumlist">${ch.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="fine">Standard rules and cards.</p>'}
       ${action}${hint ? `<p class="fine">${hint}</p>` : ''}
-      <div class="sum-more"><button type="button" class="link" data-act="copy">${ui('copy', 14)}Copy command</button><button type="button" class="link" data-act="reset">${ui('reset', 14)}Start over</button></div></div>`;
+      <div class="sum-more"><button type="button" class="link" data-act="copy">${ui('copy', 14)}Copy command</button>${(D.meta.setups || {}).testing ? `<button type="button" class="link" data-act="setup-testing" title="${esc(D.meta.setups.testing.help)}">${esc(D.meta.setups.testing.label)}</button>` : ''}<button type="button" class="link" data-act="reset">${ui('reset', 14)}Start over</button></div></div>`;
     bar.innerHTML = `<div class="startbar-in"><div><b>${p.type === 'sim' ? p.games.toLocaleString() + ' sim games' : 'Real game'}</b><span>${p.players} players · ${plural(p.rounds, 'round')}${ch.length ? ' · ' + plural(ch.length, 'change') : ''}</span></div>${action.replace(' big', '').replace('id="handover"', 'data-handover')}</div>`;
     const enc = btoa(unescape(encodeURIComponent(JSON.stringify(B)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     $$('#handover, [data-handover]').forEach((a) => { a.href = `${D.config.control}/#/run?c=${enc}`; });
@@ -1015,6 +1015,7 @@
         else if (a === 'deck-farm' || a === 'deck-cats') { B.roles = allOf('roles').filter((n) => (D.card[n].type === 'farm') === (a === 'deck-farm')); drawCards(); }
         else if (a === 'deck-reset') { B[k] = null; drawCards(); }
         else if (a === 'rule-reset') { delete B.rules[el.dataset.key]; redrawRule(el.dataset.key); if (el.dataset.key === 'game.pool_reveal') drawCards(); }
+        else if (a === 'setup-testing') { const s = D.meta.setups.testing; B.roles = [...s.roles]; B.flowers = [...s.flowers]; B.startPool = [...s.start_pool]; B.reveals = []; for (const [rk, v] of Object.entries(s.rules)) { if (v === baseVal(rk)) delete B.rules[rk]; else B.rules[rk] = v; } drawAll(); toast('Testing setup: no flowers, and a fixed pool of simple animals.'); }
         else if (a === 'reset') { B = Object.assign(blank(), { variant: D.variants[0].name }); R.q = ''; drawAll(); toast('Back to the standard setup.'); }
         else if (a === 'copy') { try { await navigator.clipboard.writeText(command()); toast('Command copied. Run it in sim/ on the PC.'); } catch { openSheet(`<h2>Command</h2><p class="fine">Run it in the sim folder on the PC.</p><pre class="code">${esc(command())}</pre>`, 'Command'); } return; }
         else if (a === 'start') { start(el); return; }
@@ -1200,8 +1201,10 @@
   const TARGET_LABELS = { Gecko: ['Copy whose animal?', 'then use it on whom?'], Copycat: ['Copy whose animal?', 'then use it on whom?'], 'Rag Doll': ['Visit whom?', 'then send them where?'], 'Cat Burgler': ['Steal from whom?', 'then who gets the eggs?'] };
   const ACTION = { wink: ['Wink', 'They die at once. Nobody is told it was you.'], bond: ['Handshake', 'Golden Wattle: bond with a player.'], touch: ['Touch', 'Stinging Bush: they die.'], sunflower: ['Sunflower', 'Spend an egg to learn if a player is a certain animal.'], challenge: ['Challenge', 'Guess every animal. Right: you win alone. Wrong: you die.'], double_down: ['Double down', 'Crimson Kunzea: double your score this round.'] };
   function words(s) { return s.trim() ? s.trim().split(/\s+/).length : 0; }
+  const liveTurn = (pd) => !!((pd || {}).meta || {}).live;
   function turnValid(pd, u) {
     const f = pd.fields;
+    if (pd.kind === 'day' && liveTurn(pd) && dayIdle(u)) return false;
     if (f.targets && (u.targets.length < (f.targets.min ?? 1) || u.targets.length > (f.targets.max ?? 1))) return false;
     if (f.role && f.role.required !== false && f.role.options.length && !u.role) return false;
     if (f.cards && pd.kind !== 'day' && (u.cards.length < f.cards.min || u.cards.length > f.cards.max)) return false;
@@ -1220,7 +1223,7 @@
     return '';
   }
   const dayIdle = (u) => !u.say.trim() && !u.wtext.trim() && !u.act && !u.caw;
-  const sendInner = (u) => (dayIdle(u) ? '<span>Pass</span>' : ui('send', 20));
+  const sendInner = (u, pd) => (dayIdle(u) && !liveTurn(pd) ? '<span>Pass</span>' : ui('send', 20));
   function playerPick(pd, u, s) {
     const f = pd.fields.targets, max = f.max ?? 1, labels = TARGET_LABELS[s.me.role];
     const head = pd.kind === 'vote' ? 'Throw at' : max === 2 ? (labels ? labels[u.targets.length ? 1 : 0] : 'Choose two, in order') : 'Visit';
@@ -1269,8 +1272,8 @@
       }
       if (tags) h += `<div class="c-tags">${tags}</div>`;
       h += `<div class="composer"><button type="button" class="c-plus${u.more ? ' on' : ''}" data-more aria-label="More actions" aria-expanded="${u.more}">${ui('plus', 20)}</button>
-        <div class="c-box"><textarea id="tsay" rows="1" enterkeyhint="send" placeholder="${noise ? 'Only bird or cat noises' : 'Message the table'}" aria-label="Message the table">${esc(u.say)}</textarea><span class="t-count${n > limit ? ' over' : ''}" id="tcount" ${n > limit * .7 ? '' : 'hidden'}>${n}/${limit}</span></div>
-        <button type="button" class="c-send${dayIdle(u) ? ' pass' : ''}" id="tsend" aria-label="Send" ${turnValid(pd, u) ? '' : 'disabled'}>${sendInner(u)}</button></div>`;
+        <div class="c-box"><textarea id="tsay" rows="1" enterkeyhint="send" placeholder="${noise ? 'Only bird or cat noises' : liveTurn(pd) ? 'Speak whenever you like' : 'Message the table'}" aria-label="Message the table">${esc(u.say)}</textarea><span class="t-count${n > limit ? ' over' : ''}" id="tcount" ${n > limit * .7 ? '' : 'hidden'}>${n}/${limit}</span></div>
+        <button type="button" class="c-send${dayIdle(u) && !liveTurn(pd) ? ' pass' : ''}" id="tsend" aria-label="Send" ${turnValid(pd, u) ? '' : 'disabled'}>${sendInner(u, pd)}</button></div>`;
     }
     return h;
   }
@@ -1316,7 +1319,7 @@
   function refreshSend() {
     const pd = P.data && P.data.pending, b = $('#tsend'); if (!pd || !b) return;
     b.disabled = !turnValid(pd, P.u);
-    if (pd.kind === 'day') { b.innerHTML = sendInner(P.u); b.classList.toggle('pass', dayIdle(P.u)); } else b.textContent = submitLabel(pd, P.u);
+    if (pd.kind === 'day') { b.innerHTML = sendInner(P.u, pd); b.classList.toggle('pass', dayIdle(P.u) && !liveTurn(pd)); } else b.textContent = submitLabel(pd, P.u);
   }
   function wireTurn() {
     const box = $('#turn');
