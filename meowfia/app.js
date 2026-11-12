@@ -272,7 +272,7 @@
   function renderGame() {
     const g = G.game, rv = g.review || {};
     const open = spoil('all');
-    const title = open && rv.headline ? rv.headline : `${g.variant}, ${g.players.length} players`;
+    const title = open && (rv.title || rv.headline) ? rv.title || rv.headline : `${g.variant}, ${g.players.length} players`;
     document.title = title + ' · Meowfia Lab';
     const tabs = [['overview', 'Overview'], ...g.rounds.map((r) => ['r' + r.round, 'Round ' + r.round])];
     const viewLabel = G.view === 'all' ? 'Everything' : G.view === 'table' ? 'No spoilers' : 'As ' + G.view;
@@ -327,17 +327,22 @@
   }
   const listBlock = (title, items, empty) => `<section class="block"><h3>${title}</h3>${items.length ? `<ul class="notes">${items.map((x) => `<li>${x}</li>`).join('')}</ul>` : `<p class="muted">${empty}</p>`}</section>`;
 
+  // The overview folds like a round: every row is closed to start and says its one headline fact.
   function overview(g) {
     const rv = g.review, open = spoil('all');
-    let h = '';
-    if (!open) h += `<div class="spoiler"><div><b>Spoilers are hidden.</b><span>The recap and final scores are tucked away. Read the rounds in order, then reveal.</span></div><button class="btn" data-reveal="all">Reveal the whole game</button></div>`;
-    if (open && rv) h += `<section class="recap"><p class="lead">${esc(rv.summary)}</p>${meters(rv.scores)}</section>`;
-    if (open) {
-      h += `<section class="block"><h3>Final scores</h3>${standings(g, g.scores)}
-        <div class="breakdown">${Object.entries(g.scores).sort((a, b) => b[1] - a[1]).map(([n]) => { const b = g.breakdown[n]; return `<div class="brow"><span class="brow-name">${dot(g, n)}${esc(n)}</span><span class="brow-parts">${pill(`${b.pile} banked`, 'yolk')}${pill(`${b.kept} kept`)}${b.bonus ? pill(`${b.bonus > 0 ? '+' : ''}${b.bonus} bonus`, 'flower') : ''}</span>${hand(g, b.pile_cards)}</div>`; }).join('')}</div>
-        <p class="fine">A score is the value of every card banked, plus 1 for each card kept, plus bonuses.</p></section>`;
-    }
-    h += `<section class="block"><h3>Rounds</h3><div class="rlist">${g.rounds.map((rec) => {
+    const secs = [];
+    const add = (id, label, ic, hint, html) => secs.push({ id: 'ov-' + id, label, ic, hint, html });
+    const top = Object.entries(g.scores).sort((x, y) => y[1] - x[1]);
+    const result = (rec) => {
+      const v = (rec.cycles[rec.cycles.length - 1] || {}).vote || {}, out = (v.eliminated || [])[0];
+      return rec.skipped ? 'Skipped' : rec.exclusive_winner ? 'Won alone' : !out ? 'Nobody out' : v.corpse ? 'Kept hidden' : v.revealed[out] === 'Meowfia' ? 'Cat caught' : 'Cats escaped';
+    };
+    if (open && rv) add('story', 'Story', 'rules', rv.headline, `<p class="lead">${esc(rv.summary)}</p>
+      ${(rv.highlights || []).length ? `<h4>Moments worth reading</h4><ul class="notes">${rv.highlights.map((x) => `<li><a href="${gameHref(g, 'r' + x.round)}">Round ${x.round}</a> ${esc(x.text)}</li>`).join('')}</ul>` : ''}`);
+    if (open) add('scores', 'Scores', 'scores', `${list(g.winners || [top[0][0]])} won with ${top[0][1]}`, `${standings(g, g.scores)}
+        <div class="breakdown">${top.map(([n]) => { const b = g.breakdown[n]; return `<div class="brow"><span class="brow-name">${dot(g, n)}${esc(n)}</span><span class="brow-parts">${pill(`${b.pile} banked`, 'yolk')}${pill(`${b.kept} kept`)}${b.bonus ? pill(`${b.bonus > 0 ? '+' : ''}${b.bonus} bonus`, 'flower') : ''}</span>${hand(g, b.pile_cards)}</div>`; }).join('')}</div>
+        <p class="fine">A score is the value of every card banked, plus 1 for each card kept, plus bonuses.</p>`);
+    add('rounds', 'Rounds', 'games', g.rounds.every((r) => spoil(r.round)) ? g.rounds.map(result).join(' · ') : plural(g.rounds.length, 'round'), `<div class="rlist">${g.rounds.map((rec) => {
       const cyc = rec.cycles[rec.cycles.length - 1] || {}, v = cyc.vote || {}, s = spoil(rec.round);
       const out = (v.eliminated || [])[0];
       const recap = open && rv ? ((rv.rounds || []).find((x) => x.round === rec.round) || {}).recap : '';
@@ -345,22 +350,24 @@
       return `<a class="rcard" href="${gameHref(g, 'r' + rec.round)}"><div class="rcard-top"><b>Round ${rec.round}</b><span class="rcard-cards">${rec.revealed.filter((x) => !x.hidden || s).map((x) => `<span class="cdot">${icon(x.face)}</span>`).join('')}</span>${ui('next', 16)}</div>
         <div class="cast">${g.players.map((n) => av(g, n, s ? rec.players[n] : null, 's').replace(/ data-card="[^"]*"/, '')).join('')}</div>
         <p>${esc(recap || line)}</p></a>`;
-    }).join('')}</div></section>`;
+    }).join('')}</div>`);
+    if (open && rv && rv.scores) add('review', 'Review', 'minds', REVIEW.filter((k) => rv.scores[k] !== undefined).sort((x, y) => rv.scores[y] - rv.scores[x]).slice(0, 3).map((k) => `${cap(k)} ${rv.scores[k]}`).join(' · '), meters(rv.scores));
     if (open && rv) {
-      h += `<div class="cols">${listBlock('Notes for the designer', (rv.design_notes || []).map(esc), 'None.')}
-        ${listBlock('Rules players misread', (rv.confusions || []).map((x) => `<b>${esc(x.player)}, round ${x.round}.</b> ${esc(x.what)}`), 'Nobody misread anything.')}</div>
-        ${listBlock('Moments worth reading', (rv.highlights || []).map((x) => `<a href="${gameHref(g, 'r' + x.round)}">Round ${x.round}</a> ${esc(x.text)}`), 'None noted.')}`;
-    } else if (open) h += '<p class="muted">This game has no written review.</p>';
+      const dn = rv.design_notes || [], cf = rv.confusions || [];
+      add('notes', 'Notes', 'info', `${dn.length} for the designer · ${plural(cf.length, 'misread rule')}`, `<div class="cols">${listBlock('Notes for the designer', dn.map(esc), 'None.')}
+        ${listBlock('Rules players misread', cf.map((x) => `<b>${esc(x.player)}, round ${x.round}.</b> ${esc(x.what)}`), 'Nobody misread anything.')}</div>`);
+    }
     const ov = (g.overrides || []).map(describe).filter(Boolean);
-    h += `<section class="block"><h3>Setup</h3><dl class="facts">
+    add('setup', 'Setup', 'run', gameChanges(g).join(' · ') || 'Standard game', `<dl class="facts">
       <dt>Version</dt><dd><a href="#/rules/${encodeURIComponent(g.variant)}">${esc(g.variant)}</a></dd>
       ${ov.length ? `<dt>Changes</dt><dd><ul class="plain">${ov.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd>` : ''}
       <dt>Players</dt><dd>${g.players.map((n) => `<span class="pname">${dot(g, n)}${esc(n)}${g.human === n ? ' <small>played by a person</small>' : (g.seat_models || {})[n] ? ` <small>${esc(model(g.seat_models[n]))}</small>` : ''}</span>`).join('')}</dd>
       <dt>Played by</dt><dd>${esc(model(g.model))}${g.effort ? `, ${esc(g.effort)} effort` : ''}${g.review_model && g.review ? `; reviewed by ${esc(model(g.review_model))}` : ''}</dd>
       <dt>Seed</dt><dd>${g.seed}</dd>
       <dt>Length</dt><dd>${g.minutes ? g.minutes + ' minutes' : 'unknown'}${g.usage ? `, ${g.usage.calls} turns` : ''}</dd>
-      ${g.usage ? `<dt>Usage</dt><dd>About $${g.usage.api_equivalent_usd} at API prices, covered by the subscription</dd>` : ''}</dl></section>`;
-    return h;
+      ${g.usage ? `<dt>Usage</dt><dd>About $${g.usage.api_equivalent_usd} at API prices, covered by the subscription</dd>` : ''}</dl>`);
+    return `${open ? '' : `<div class="spoiler"><div><b>Spoilers are hidden.</b><span>The story and final scores are tucked away. Read the rounds in order, then reveal.</span></div><button class="btn" data-reveal="all">Reveal the whole game</button></div>`}
+      ${secs.map((x) => `<details class="phase" id="${x.id}" ${G.open.has(G.tab + x.id) ? 'open' : ''}><summary class="phase-head"><span class="phase-ic">${ui(x.ic, 18)}</span><h2>${esc(x.label)}</h2>${x.hint ? `<span class="phase-hint">${esc(x.hint)}</span>` : ''}${ui('down', 18)}</summary>${x.html}</details>`).join('')}`;
   }
 
   /* ----- the table diagram ----- */
