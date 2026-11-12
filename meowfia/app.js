@@ -204,7 +204,26 @@
     const t = (D.meta.setups || {}).testing, at = (k) => { const x = o.find((y) => parseOverride(y)[0] === k); return x ? parseOverride(x)[1] : undefined; };
     const basics = t && Array.isArray(at('game.start_pool')) && sameSet(at('game.start_pool'), t.start_pool) && Array.isArray(at('deck.roles')) && sameSet(at('deck.roles'), t.roles);
     if (basics) o = o.filter((y) => !BASICS.includes(parseOverride(y)[0]) || (parseOverride(y)[0] === 'deck.flowers' && at('deck.flowers').length));
-    return [g.variant, modelsOf(g), `${g.players.length} players`, ...(basics ? ['Basics only'] : []), ...o.map(describe).filter(Boolean)];
+    return [...new Set([g.variant, modelsOf(g), `${g.players.length} players`, ...(basics ? ['Basics only'] : []), ...o.map(tagOf).filter(Boolean)])];
+  }
+  function tagOf(o) {                            // a changed setting in one to three words
+    const [key, v] = parseOverride(o);
+    const one = (cards) => { const u = [...new Set(cards)]; return u.length === 1 ? u[0] : 'Chosen reveals'; };
+    if (key === 'deck.roles') return `${v.length} animals`;
+    if (key === 'deck.flowers') return v.length ? plural(v.length, 'flower') : 'No flowers';
+    if (key === 'game.start_pool') return 'Chosen pool';
+    if (key === 'game.first_reveal') return one(v);
+    if (key === 'game.reveal_plan') return one(v.flat());
+    if (key === 'game.seat_roles') return 'Fixed animals';
+    if (key === 'game.seat_sides') return 'Fixed sides';
+    if (key === 'game.seat_rounds') return '';
+    if (key.startsWith('text.')) return 'Reworded cards';
+    if (key === 'rules.notes') return 'Extra notes';
+    const m = settingMeta(key), t = m && m.tag;
+    if (!t) return cap(key.split('.').pop().replace(/_/g, ' '));
+    if (Array.isArray(t)) return t[v ? 0 : 1];
+    if (typeof t === 'object') return t[v] || String(v);
+    return t.replace('{}', m.kind === 'percent' ? Math.round(v * 100) : v);
   }
   const gamePool = (g) => (g.pool || [...new Set(g.rounds.flatMap((r) => r.revealed))]).filter((n) => D.card[n] && !D.card[n].buffer);
   function gameCard(g) {
