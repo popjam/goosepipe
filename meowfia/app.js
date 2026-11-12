@@ -86,7 +86,7 @@
   const eggToken = (i) => `<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="${SEAT[i % 8]}" opacity=".22"/><ellipse cx="32" cy="34" rx="15.5" ry="19.500" fill="${SEAT[i % 8]}"/><ellipse cx="26" cy="26" rx="4" ry="6" fill="#fff" opacity=".45" transform="rotate(24 26 26)"/></svg>`;
   function av(g, name, p, size = '') {
     const i = g.players.indexOf(name);
-    if (p && p.role) return `<span class="av ${size} ${sideClass(p.alignment)}${p.dead ? ' dead' : ''}" title="${esc(name)}, the ${esc(p.role)}">${icon(p.role)}</span>`;
+    if (p && p.role) return `<span class="av ${size} ${sideClass(p.alignment)}${p.dead ? ' dead' : ''}" data-card="${esc(p.role)}" title="${esc(name)}, the ${esc(p.role)}">${icon(p.role)}</span>`;
     return `<span class="av ${size} tok${p && p.dead ? ' dead' : ''}" title="${esc(name)}">${eggToken(i)}</span>`;
   }
   const dot = (g, name) => `<i class="seat-dot" style="background:${SEAT[g.players.indexOf(name) % 8]}"></i>`;
@@ -256,8 +256,6 @@
     body.onclick = (e) => {
       const b = e.target.closest('[data-reveal]');
       if (b) { G.revealed.add(b.dataset.reveal === 'all' ? 'all' : +b.dataset.reveal); const y = window.scrollY; renderGame(); window.scrollTo(0, y); return; }
-      const s = e.target.closest('[data-seat]');
-      if (s && s.dataset.round) { openPlayer(g, +s.dataset.round, s.dataset.seat); return; }
       const j = e.target.closest('[data-jump]');
       if (j) { const el = document.getElementById(j.dataset.jump); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     };
@@ -290,7 +288,7 @@
       const recap = open && rv ? ((rv.rounds || []).find((x) => x.round === rec.round) || {}).recap : '';
       const line = rec.skipped ? 'Skipped: the Cactus Flower showed there were no Meowfia.' : rec.exclusive_winner ? (s ? `${rec.exclusive_winner} won the round alone.` : 'Ended early by a challenge.') : out ? (s && !v.corpse ? `${out} was eggsecuted and turned out to be ${v.revealed[out] === 'Meowfia' ? 'a cat' : 'Farm'}.` : `${out} was eggsecuted.`) : 'Nobody was eggsecuted.';
       return `<a class="rcard" href="${gameHref(g, 'r' + rec.round)}"><div class="rcard-top"><b>Round ${rec.round}</b><span class="rcard-cards">${rec.revealed.filter((x) => !x.hidden || s).map((x) => `<span class="cdot">${icon(x.face)}</span>`).join('')}</span>${ui('next', 16)}</div>
-        <div class="cast">${g.players.map((n) => av(g, n, s ? rec.players[n] : null, 's')).join('')}</div>
+        <div class="cast">${g.players.map((n) => av(g, n, s ? rec.players[n] : null, 's').replace(/ data-card="[^"]*"/, '')).join('')}</div>
         <p>${esc(recap || line)}</p></a>`;
     }).join('')}</div></section>`;
     if (open && rv) {
@@ -320,7 +318,7 @@
     const seats = g.players.map((name, i) => {
       const p = people[name] || {}, pos = seatPos(i, n), show = opts.show ? opts.show(name) : true;
       const sub = opts.sub ? opts.sub(name) : '';
-      return `<button type="button" class="seat${(opts.out || []).includes(name) ? ' out' : ''}" style="left:${pos.x}%;top:${pos.y}%" data-seat="${esc(name)}" data-round="${round}">
+      return `<button type="button" class="seat${(opts.out || []).includes(name) ? ' out' : ''}" style="left:${pos.x}%;top:${pos.y}%" data-seat="${esc(name)}"${show && p.role ? ` data-card="${esc(p.role)}"` : ''}>
         <span class="seat-face">${av(g, name, show ? p : { dead: p.dead }, 'l')}${p.nest !== undefined ? `<span class="nest" title="Cards in nest">${p.nest}</span>` : ''}</span>
         <span class="seat-name">${esc(name)}</span>${sub ? `<span class="seat-sub">${sub}</span>` : ''}</button>`;
     }).join('');
@@ -442,11 +440,11 @@
     const startPeople = Object.fromEntries(g.players.map((n) => [n, { ...start[n], nest: start[n].hand.length }]));
     const deal = `<div class="castgrid">${g.players.map((n) => {
       const p = start[n], v = see(n);
-      return `<button type="button" class="pcard${v ? ' ' + sideClass(p.alignment) : ''}" data-seat="${esc(n)}" data-round="${R}">${av(g, n, v ? p : null, 'l')}
+      return `<button type="button" class="pcard${v ? ' ' + sideClass(p.alignment) : ''}" data-seat="${esc(n)}"${v ? ` data-card="${esc(p.role)}"` : ''}>${av(g, n, v ? p : null, 'l')}
         <span class="pcard-name">${esc(n)}${n === rec.dealer ? '<small>dealer</small>' : ''}</span>
         <span class="pcard-role">${v ? esc(p.role) + (p.told !== p.role ? ` <small>thinks ${esc(p.told)}</small>` : '') : 'Secret'}</span>
         <span class="pcard-nest">${ui('eggs', 13)}${p.hand.length}</span></button>`;
-    }).join('')}</div><p class="fine">${s ? 'Tap a player to follow their round.' : 'Each player knows only their own animal. Tap a player to see what the table could see.'}</p>`;
+    }).join('')}</div><p class="fine">${s ? 'Tap an animal to see its card.' : 'Each player knows only their own animal.'}</p>`;
     add('pool', 'Pool', 'pool', `${plural(rec.revealed.length, 'new card')}`, pool);
     add('deal', 'Deal', 'deal', s ? 'Who was secretly what' : 'Secret', deal);
     if (rec.dusk) add('dusk', 'Dusk', 'dawn', 'Talk before the night', dayLog(g, rec.dusk, seen(start), see));
@@ -516,35 +514,6 @@
       ${sections.map((x, i) => `<section class="phase" id="${x.id}"><header class="phase-head"><span class="phase-ic">${ui(x.ic, 18)}</span><h2>${esc(x.label)}</h2>${x.hint ? `<span class="phase-hint">${esc(x.hint)}</span>` : ''}</header>${x.html}</section>`).join('')}
       ${s ? '' : `<div class="spoiler"><div><b>Finished round ${R}?</b><span>Reveal who was what, what happened at night and what everyone was thinking.</span></div><button class="btn primary" data-reveal="${R}">Reveal round ${R}</button></div>`}
       <nav class="pager"><a class="btn" href="${prev[0]}">${ui('back', 16)}${prev[1]}</a><a class="btn primary" href="${next[0]}">${next[1]}${ui('next', 16)}</a></nav>`;
-  }
-
-  /* ----- one player's round (tap a seat) ----- */
-  function openPlayer(g, R, name) {
-    const rec = g.rounds.find((r) => r.round === R); if (!rec) return;
-    const v = sees(R, name), start = rec.players[name];
-    let h = `<header class="sheet-who">${av(g, name, v ? start : null, 'xl')}<div><h2>${esc(name)}</h2><div class="pills">${v ? sidePill(start.alignment) + cchip(start.role) : pill('Animal hidden', 'muted')}${v && start.told !== start.role ? pill('believes they are the ' + esc(start.told), 'flower') : ''}${v && start.winks ? pill('holds a Wink', 'yolk') : ''}</div></div></header>`;
-    h += `<h4>Nest at the start</h4>${v ? hand(g, start.hand) : `<p>${plural(start.hand.length, 'card')}</p>`}`;
-    rec.cycles.forEach((cyc, ci) => {
-      const tag = rec.cycles.length > 1 ? ` (${ci + 1})` : '';
-      (cyc.nights || []).forEach((night) => {
-        if (!v) return;
-        const c = night.choices[name], rows = nightRows(night).filter((r) => r.actor === name || r.e.to === name);
-        h += `<h4>Night${tag}</h4>`;
-        if (c) h += `<p>Chose ${esc(list(c.targets) || 'nobody')}${c.role ? `, naming the ${esc(c.role)}` : ''}${night.visits[name] && night.declared[name] !== night.visits[name] ? `; actually visited ${esc(night.visits[name])}` : ''}.</p>${c.note ? `<div class="thought"><i>thinks</i>${esc(c.note)}</div>` : ''}`;
-        if (rows.length) h += `<ul class="events">${rows.map((r) => `<li class="ev ${r.cls}"><span><b>${esc(r.actor)}</b> ${esc(r.text)}</span><i class="ev-ic">${ui(r.badge, 16)}</i></li>`).join('')}</ul>`;
-      });
-      const r = (cyc.reports || {})[name];
-      if (r && v) h += `<h4>Dawn report${tag}</h4><ul class="plain">${r.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`;
-      const said = (cyc.day || []).filter((e) => e.k === 'say' && e.p === name && !(e.anon && !v));
-      if (said.length) h += `<h4>What they said${tag}</h4>${said.map((e) => `<div class="quote">${esc(e.text)}${e.note && v ? `<div class="thought"><i>thinks</i>${esc(e.note)}</div>` : ''}</div>`).join('')}`;
-      const t = cyc.vote && cyc.vote.throws[name];
-      if (t) {
-        const res = (cyc.vote.results || {})[name];
-        h += `<h4>Eggsecution${tag}</h4><p>Threw ${v ? hand(g, t.cards) : plural(t.cards.length, 'card')} at <b>${esc(t.target)}</b>.${spoil(R) && res && !cyc.vote.again ? ` ${res.result === 'won' ? `Banked ${res.points}.` : res.result === 'clownfish' ? 'The Clownfish took them.' : 'Lost them.'}` : ''}</p>${t.note && v ? `<div class="thought"><i>thinks</i>${esc(t.note)}</div>` : ''}`;
-      }
-    });
-    if (spoil(R) && rec.gained) h += `<h4>Score</h4><p>${rec.gained[name] > 0 ? '+' : ''}${rec.gained[name] || 0} this round, ${rec.scores[name]} in total.</p>`;
-    openSheet(h, name);
   }
 
   /* ================= sheets (cards, players, pickers) ================= */
