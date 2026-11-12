@@ -1274,7 +1274,7 @@
     $('#ptable').onclick = () => { const r = P.data; if (!r || !r.state) return; openSheet(`<h2>The table</h2>${playTable(r)}<h4>What you did this round</h4>${didList(r.state)}`, 'The table'); drawLines(); setTimeout(drawLines, 400); };
     $('#ppause').onclick = () => setPause(!(P.data || {}).paused);
     $('#pleave').onclick = () => {
-      const r = P.data || {}, live = r.status === 'running' || r.status === 'queued';
+      const r = P.data || {}, live = (r.status === 'running' || r.status === 'queued') && !r.over;   // once the game is over, leaving never stops the review
       if (!live) { location.hash = '#/run'; return; }
       openSheet(`<h2>Leave the table?</h2><div class="leave">
         <button type="button" class="c-opt" data-leave="pause"><b>${r.paused ? 'Carry on playing' : 'Pause the game'}</b><span>${r.paused ? 'The table picks up where it stopped.' : 'Nothing more happens until you come back. Replies already being written are held.'}</span></button>
