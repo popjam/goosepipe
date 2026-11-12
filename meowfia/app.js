@@ -760,6 +760,41 @@
       <path d="${d}" class="sp-line"/>
       ${vals.map((v, i) => (v === null || v === undefined ? '' : `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" class="sp-dot"/><circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="13" class="sp-hit" data-tip="${esc(rows[i].title)}: ${v}" data-go="${esc(rows[i].id)}"/>`)).join('')}</svg>`;
   }
+  // What the scripted Lab run found: each exploiter's win share and what the solver says about the rounds.
+  function labBlock(lab) {
+    if (!lab || !lab.kinds) return '';
+    const pc = (v) => (v === null || v === undefined ? '–' : Math.round(v * 100) + '%');
+    const NAME = { follower: 'Follows the crowd, stakes everything', silent: 'Never speaks', hoarder: 'Hoards until the last round', leader: 'Votes against the leader' };
+    const sv = lab.solver || {};
+    return `<h4 class="sub">Scripted players (${esc(String(lab.games))} games each, chance is ${pc(1 / 6)})</h4>
+      <ul class="plain lablist">${Object.entries(lab.kinds).map(([k, v]) => `<li><span>${esc(NAME[k] || k)}</span><b>${pc(v)}</b></li>`).join('')}</ul>
+      <p class="fine">The round solver over ${sv.rounds || 0} scripted rounds: a perfect table puts ${pc(sv.ceiling_mean)} on the true cats on average; ${pc(sv.ceiling_over_95)} of rounds are given away (above 95%); ${pc(sv.cover_nonzero)} of cats had a lie that fitted every honest report.</p>`;
+  }
+
+  // The structural analysis' Table 6: each measure against its target, for every game or only the frozen control.
+  function measuresBlock(m) {
+    const fmt = (v, u) => (v === null || v === undefined ? '–' : u === '%' ? Math.round(v * 100) + '%' : u === 'r' ? v.toFixed(2) : u === 'x' ? v.toFixed(2) : v.toFixed(1));
+    const tgt = (r) => (r.lo !== null && r.hi !== null ? `${fmt(r.lo, r.unit)}–${fmt(r.hi, r.unit)}` : r.lo !== null ? `≥ ${fmt(r.lo, r.unit)}` : `≤ ${fmt(r.hi, r.unit)}`);
+    const which = store.get('t6', 'all') === 'control' && m.control.n.games ? 'control' : 'all';
+    const set = m[which];
+    const lab = m.lab || {};
+    return `<section class="block" id="t6"><h3>How the game measures up</h3>
+      <p class="fine">The measures from the structural analysis (Table 6), each against its first target. ${which === 'control' ? `Games on the frozen control: ${set.n.games} games, ${set.n.rounds} rounds.` : `Every game: ${set.n.games} games, ${set.n.rounds} rounds.`} Scripted measures come from ${lab.when ? `the Lab run of ${esc(when(lab.when, true))}` : 'Lab runs, when there are any'}.</p>
+      <div class="seg small t6pick">${[['all', 'Every game'], ['control', `Control (${m.control.n.games})`]].map(([k, l]) => `<button type="button" class="${which === k ? 'on' : ''}" data-t6="${k}" ${k === 'control' && !m.control.n.games ? 'disabled' : ''}>${l}</button>`).join('')}</div>
+      <div class="scroll-x"><table class="data t6"><thead><tr><th>Measure</th><th>Now</th><th>Target</th><th>Property</th></tr></thead><tbody>
+      ${set.rows.map((r) => `<tr class="${r.met === true ? 'met' : r.met === false ? 'miss' : ''}"><td><b>${esc(r.label)}</b><small>${esc(r.definition)}</small></td><td>${r.value === null || r.value === undefined ? '<span class="muted">not measured</span>' : `<b>${fmt(r.value, r.unit)}</b> ${r.met ? ui('check', 14) : ''}`}</td><td>${tgt(r)}</td><td>${esc(r.property)}</td></tr>`).join('')}</tbody></table></div>${labBlock(lab)}</section>`;
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-t6]'); if (b) { store.set('t6', b.dataset.t6); viewHealth(); } });
+
+  // A rule change's registered hypothesis and the result of its paired test, if it has one.
+  function changeTest(c) {
+    if (!c.hypothesis && !c.result) return '';
+    const r = c.result || {}, f = (v) => (v === null || v === undefined ? '–' : (Math.abs(v) < 1 ? (v * 100).toFixed(1) + ' pts' : v.toFixed(2)));
+    const tone = { adopt: 'farm', reject: 'cat' }[r.verdict] || 'muted';
+    return `<div class="ctest">${c.hypothesis ? `<span><b>Expected:</b> ${esc(c.hypothesis)}${c.measure ? ` (${esc(c.measure)} ${c.direction === 'down' ? 'down' : 'up'})` : ''}</span>` : ''}
+      ${r.verdict ? `<span>${pill(esc(r.verdict), tone)} ${r.effect === null || r.effect === undefined ? '' : `effect ${f(r.effect)}, 95% interval ${f((r.interval || [])[0])} to ${f((r.interval || [])[1])}`}, ${r.rounds} rounds an arm, ${esc(r.seats || '')} seats</span>` : '<span class="muted">Not tested yet.</span>'}</div>`;
+  }
+
   async function viewHealth() {
     document.title = 'Game health · Meowfia Lab';
     page('<div class="loading" role="status">Adding up the games</div>');
@@ -775,12 +810,13 @@
         <div class="sparks">${TREND.map(([k, label, top, note]) => { const last = [...rows].reverse().find((r) => r[k] !== null && r[k] !== undefined); return `<figure class="sparkbox"><figcaption><b>${label}</b><span>${last ? last[k] + (top === 100 ? '%' : '') : '–'}</span></figcaption>${spark(rows, k, top, marks)}<small>${note}</small></figure>`; }).join('')}</div>
         <div class="sp-tip" id="sptip" hidden></div>
         <details class="issue"><summary><b>The numbers</b>${ui('down', 16)}</summary><div class="scroll-x"><table class="data"><thead><tr><th>Game</th>${TREND.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${[...rows].reverse().map((r) => `<tr><td><a href="#/game/${encodeURIComponent(r.id)}">${esc(r.title)}</a></td>${TREND.map(([k]) => `<td>${r[k] ?? '–'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details></section>
+      ${h.measures ? measuresBlock(h.measures) : ''}
       <section class="block"><h3>What each animal does</h3><div class="scroll-x"><table class="data"><thead><tr><th>Animal</th><th>Dealt</th><th>Games</th><th>Did something</th><th>Reached another player</th><th>Holder won the round</th></tr></thead><tbody>
         ${h.cards.map((c) => `<tr><td>${cchip(c.name)}</td><td>${c.dealt}</td><td>${c.games}</td><td>${pct(c.fired, c.dealt)}</td><td>${pct(c.reached, c.dealt)}</td><td>${pct(c.won, c.dealt)}</td></tr>`).join('')}</tbody></table></div>
         <p class="fine">Animals never dealt are not listed. A few deals say little: look at the "Dealt" column first.</p>
         ${h.flowers.length ? `<h4 class="sub">Flowers that have been in play</h4><div class="pills">${h.flowers.map((f) => cchip(f.name, ` <small>${plural(f.games, 'game')}</small>`)).join('')}</div>` : ''}</section>
       <div class="cols">${group('What keeps needing a fix', h.issues, 'No notes yet.')}${group('What keeps working', h.worked || [], 'Nothing has been singled out yet.')}</div>
-      <section class="block"><h3>Rule changes</h3>${h.changes.length ? `<ol class="changes">${h.changes.map((c) => `<li><time>${esc(when(c.date, true))}</time><div><b>${esc(c.title)}</b><p>${esc(c.detail)}</p>${c.game ? `<a href="#/game/${encodeURIComponent(c.game)}">First game on it: ${esc(c.game_title)}</a>` : '<span class="muted">No game played on it yet.</span>'}</div></li>`).join('')}</ol>` : '<p class="muted">No changes logged.</p>'}</section>`);
+      <section class="block"><h3>Rule changes</h3>${h.changes.length ? `<ol class="changes">${h.changes.map((c) => `<li><time>${esc(when(c.date, true))}</time><div><b>${esc(c.title)}</b>${c.experimental ? ' <span class="pill muted">experiment</span>' : ''}<p>${esc(c.detail)}</p>${changeTest(c)}${c.game ? `<a href="#/game/${encodeURIComponent(c.game)}">First game on it: ${esc(c.game_title)}</a>` : '<span class="muted">No game played on it yet.</span>'}</div></li>`).join('')}</ol>` : '<p class="muted">No changes logged.</p>'}</section>`);
     const tip = $('#sptip');
     app.onpointerover = (e) => { const t = e.target.closest('.sp-hit'); if (!t || !tip) return; tip.textContent = t.dataset.tip; tip.hidden = false; const r = t.getBoundingClientRect(); tip.style.left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, r.left + r.width / 2 - tip.offsetWidth / 2)) + 'px'; tip.style.top = (r.top + window.scrollY - tip.offsetHeight - 6) + 'px'; };
     app.onpointerout = (e) => { if (e.target.closest('.sp-hit') && tip) tip.hidden = true; };
@@ -1435,17 +1471,18 @@
   function submitLabel(pd, u) {
     if (pd.kind === 'results') return `Start round ${((P.data.state || {}).round || 0) + 1}`;
     if (pd.kind === 'night') return 'Confirm';
+    if (pd.kind === 'point') return u.targets[0] ? `Point at ${u.targets[0]}` : 'Choose who to put on trial';
     if (pd.kind === 'discard') return `Discard ${plural(u.cards.length, 'card')}`;
     if (pd.kind === 'extend') return u.cards.length ? 'Pay one egg' : 'Don\'t pay';
     if (pd.kind === 'handshake') return u.number === 1 ? 'Shake hands' : u.number === 0 ? 'Decline the handshake' : 'Accept or decline';
-    if (pd.kind === 'vote') { const n = pd.fields.cards ? u.cards.length : u.number; return u.targets[0] ? `Throw ${plural(n || 0, 'egg')} at ${u.targets[0]}` : 'Choose who to egg'; }
+    if (pd.kind === 'vote') { const n = pd.fields.cards ? u.cards.length : u.number; if (!u.targets[0]) return 'Choose who to egg'; return n ? `Throw ${plural(n, 'egg')} at ${u.targets[0]}` : `Vote for ${u.targets[0]}, staking nothing`; }
     return '';
   }
   const dayIdle = (u) => !u.say.trim() && !u.wtext.trim() && !u.act && !u.caw;
   const sendInner = (u, pd) => (dayIdle(u) && !liveTurn(pd) ? '<span>Pass</span>' : ui('send', 20));
   function playerPick(pd, u, s) {
     const f = pd.fields.targets, max = f.max ?? 1, labels = TARGET_LABELS[s.me.role];
-    const head = pd.kind === 'vote' ? 'Throw at' : max === 2 ? (labels ? labels[u.targets.length ? 1 : 0] : 'Choose two, in order') : 'Visit';
+    const head = pd.kind === 'vote' ? 'Throw at' : pd.kind === 'point' ? 'Point at' : max === 2 ? (labels ? labels[u.targets.length ? 1 : 0] : 'Choose two, in order') : 'Visit';
     return `<div class="t-field"><span class="label">${esc(cap(head))}</span><div class="t-players">${f.options.map((n) => {
       const i = u.targets.indexOf(n), p = s.players.find((x) => x.name === n) || {};
       const face = n === 'Bottlebrush' ? icon('Bottlebrush') : n === 'Nobody' ? MeowIcons.svg('?', 'unknown') : eggToken(P.data.players.indexOf(n));
@@ -1470,6 +1507,8 @@
       if (f.number) h += `<div class="t-field row"><span class="label">Stolen eggs to pass on</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
     } else if (pd.kind === 'discard') {
       h += `<div class="t-head"><b>You lost ${plural(f.cards.min, 'egg')}</b><span>Choose what to discard.</span></div>${cardPick(pd, u, 'Your nest')}`;
+    } else if (pd.kind === 'point') {
+      h += `<div class="t-head"><b>Who goes on trial?</b><span>Everyone points at once, in the open. The two with the most fingers answer once each, then everyone votes between them.</span></div>${playerPick(pd, u, s)}`;
     } else if (pd.kind === 'handshake') {
       const who = (pd.meta || {}).from || 'A player';
       h += `<div class="t-head"><b>${esc(who)} offers you a handshake</b><span>Golden Wattle: bonded players each score +3 if they are on the same side. If not, the Meowfia player scores +3 and the Farm player loses 3.</span></div><div class="seg shake">${[[1, 'Accept'], [0, 'Decline']].map(([v, l]) => `<button type="button" class="${u.number === v ? 'on' : ''}" data-shake="${v}">${l}</button>`).join('')}</div>`;
@@ -1477,6 +1516,7 @@
       h += `<div class="t-head"><b>The day is ending</b><span>Mulberry: pay one egg for one more turn of talk?</span></div>${cardPick(pd, u, 'Pay with')}`;
     } else if (pd.kind === 'vote') {
       h += `<div class="t-head"><b>Eggsecution</b><span>${me.alignment === 'Meowfia' ? 'You are Meowfia: get a Farm player out.' : 'Egg who you think is Meowfia.'}${me.dead ? ' You are dead: your eggs score but are not votes.' : ''}</span></div>${playerPick(pd, u, s)}`;
+      if (f.number && f.number.tokens) h += `<div class="t-field"><span class="label">Confidence token: multiplies what your stake banks</span><div class="seg shake">${f.number.tokens.map((v) => `<button type="button" class="${(u.number ?? f.number.min) === v ? 'on' : ''}" data-tok="${v}">${v}</button>`).join('')}</div></div>`;
       h += f.cards ? cardPick(pd, u, 'Eggs') : `<div class="t-field row"><span class="label">How many eggs (the Poppy picks which)</span>${stepper('tnum', u.number ?? f.number.min, f.number.min, f.number.max)}</div>`;
     } else {
       const limit = (f.say || {}).words || 80, n = words(u.say), acts = (f.special || {}).actions || [];
@@ -1586,6 +1626,7 @@
       }
       if ((el = t.closest('[data-role]'))) { u.role = u.role === el.dataset.role ? null : el.dataset.role; return redraw(); }
       if ((el = t.closest('[data-stepper] button'))) { const st = el.closest('[data-stepper]'); u.number = Math.max(+st.dataset.min, Math.min(+st.dataset.max, (u.number ?? +st.dataset.min) + +el.dataset.dir)); return redraw(); }
+      if ((el = t.closest('[data-tok]'))) { u.number = +el.dataset.tok; return redraw(); }
       if ((el = t.closest('[data-shake]'))) { u.number = +el.dataset.shake; return redraw(); }
       if (t.closest('[data-more]')) { u.more = !u.more; return redraw(); }
       if (t.closest('[data-caw]')) { u.caw = !u.caw; u.more = false; return redraw(); }

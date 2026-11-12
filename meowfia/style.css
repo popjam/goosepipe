@@ -965,3 +965,16 @@ select.auto { width: auto; min-width: 170px; max-width: 100%; }
 
 .live-last { margin: 8px 0 0; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .live-run + .live-run { margin-top: 12px; }
+
+.t6pick { margin: 6px 0 10px; }
+.data.t6 td { white-space: normal; vertical-align: top; text-align: left; }
+.data.t6 th { text-align: left; }
+.data.t6 td small { display: block; color: var(--ink-3); font-size: 12px; margin-top: 2px; max-width: 46ch; }
+.data.t6 tr.met td:first-child b { color: var(--farm); }
+.data.t6 tr.miss td:first-child b { color: var(--cat); }
+.data.t6 td:nth-child(2), .data.t6 td:nth-child(3) { white-space: nowrap; }
+@media (max-width: 640px) { .data.t6 th:nth-child(4), .data.t6 td:nth-child(4) { display: none; } }
+
+.ctest { display: grid; gap: 4px; margin: 6px 0; font-size: 13.5px; color: var(--ink-2); }
+
+.lablist li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
