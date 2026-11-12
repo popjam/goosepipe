@@ -606,15 +606,25 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
   const kindLine = (c) => (c.type === 'flower' ? `Flower · ${c.group}` : `${c.team} · ${D.cards.abilities[c.ability] || ''}`);
+  // A card opens as a small pop-up over whatever is on screen (a sheet stays open underneath). It never touches
+  // the page's scroll, and a tap anywhere outside it closes it.
+  const cardPop = document.createElement('div');
+  cardPop.id = 'cardpop'; cardPop.className = 'cardpop'; cardPop.hidden = true;
+  document.body.appendChild(cardPop);
+  function closeCard() { if (!cardPop.hidden) { cardPop.hidden = true; cardPop.innerHTML = ''; } }
   function openCard(name) {
     const c = D.card[name]; if (!c) return;
-    openSheet(`<div class="bigcard ${c.type}"><div class="bigcard-art" style="background:${MeowIcons.bg(name)}">${icon(name)}</div>
+    const more = `${c.reading ? `<h4>How the simulator reads it</h4><p>${esc(c.reading)}</p>` : ''}${c.note ? `<h4>At a text table</h4><p>${esc(c.note)}</p>` : ''}${c.type !== 'flower' ? `<h4>When it acts at night</h4>${c.tiers && c.tiers.length ? `<div class="pills">${c.tiers.map((t) => pill(esc(t.name))).join('')}</div>` : '<p>It has no night effect of its own.</p>'}` : ''}`;
+    cardPop.innerHTML = `<div class="cardpop-panel bigcard ${c.type}" role="dialog" aria-label="${esc(name)}"><div class="bigcard-art" style="background:${MeowIcons.bg(name)}">${icon(name)}</div>
         <div class="bigcard-text"><div class="bigcard-kind">${c.type === 'flower' ? ui('flower', 14) : ui(c.ability, 14)}${esc(kindLine(c))}</div><h2>${esc(name)}</h2><p>${esc(c.text)}</p>
-        <div class="pills">${c.buffer ? pill('Always in the pool', 'yolk') : ''}${c.implemented === false ? pill('Not simulated yet', 'muted') : ''}</div></div></div>
-      ${c.reading ? `<h4>How the simulator reads it</h4><p>${esc(c.reading)}</p>` : ''}
-      ${c.note ? `<h4>At a text table</h4><p>${esc(c.note)}</p>` : ''}
-      ${c.type !== 'flower' ? `<h4>When it acts at night</h4>${c.tiers && c.tiers.length ? `<div class="pills">${c.tiers.map((t) => pill(esc(t.name))).join('')}</div>` : '<p>It has no night effect of its own.</p>'}` : ''}`, name, 'card-sheet');
+        <div class="pills">${c.buffer ? pill('Always in the pool', 'yolk') : ''}${c.implemented === false ? pill('Not simulated yet', 'muted') : ''}</div>
+        ${more ? `<details class="cardpop-more"><summary>More about this card</summary>${more}</details>` : ''}</div></div>`;
+    cardPop.hidden = false;
   }
+  cardPop.addEventListener('click', (e) => { if (!e.target.closest('.cardpop-more')) { e.stopPropagation(); closeCard(); } });
+  for (const ev of ['touchmove', 'wheel']) cardPop.addEventListener(ev, (e) => { if (!e.target.closest('.cardpop-panel')) e.preventDefault(); }, { passive: false });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !cardPop.hidden) { e.stopImmediatePropagation(); closeCard(); } }, true);
+  window.addEventListener('hashchange', closeCard);
   // Tap a card to inspect it. Where a tap already means something else (the run builder's toggles), hold it.
   let press = null, swallow = false;
   document.addEventListener('pointerdown', (e) => {
