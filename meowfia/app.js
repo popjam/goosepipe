@@ -793,8 +793,8 @@
     page(`<header class="page-head"><h1>New run</h1><p>Set up a game exactly how you want it, then let it play on your PC.</p></header>
       <div id="conn"></div><div id="monitor"></div>
       <div class="builder" id="builder"><div class="builder-main">
-        <section class="bsec" id="sec-kind"></section><section class="bsec" id="sec-game"></section><section class="bsec" id="sec-players"></section>
-        <section class="bsec" id="sec-cards"></section><section class="bsec" id="sec-rules"></section></div>
+        <section class="bsec" id="sec-kind"></section><section class="bsec shut" id="sec-game"></section><section class="bsec shut" id="sec-players"></section>
+        <section class="bsec shut" id="sec-cards"></section><section class="bsec shut" id="sec-rules"></section></div>
         <aside class="builder-side" id="summary"></aside></div>
       <div class="startbar" id="startbar"></div>`, 'run');
     drawAll();
@@ -855,7 +855,8 @@
   /* ----- the builder's sections ----- */
   const stepper = (key, value, min, max, step = 1, label = '') => `<span class="stepper" data-stepper="${key}" data-min="${min}" data-max="${max}" data-step="${step}"><button type="button" data-dir="-1" aria-label="Less" ${value <= min ? 'disabled' : ''}>${ui('minus', 16)}</button><output>${label || value}</output><button type="button" data-dir="1" aria-label="More" ${value >= max ? 'disabled' : ''}>${ui('plus', 16)}</button></span>`;
   const toggle = (key, on) => `<button type="button" class="switch${on ? ' on' : ''}" role="switch" aria-checked="${on}" data-toggle="${key}"><i></i></button>`;
-  const secHead = (n, title, sub) => `<header class="bsec-head"><span class="step">${n}</span><div><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div></header>`;
+  // Every section after the first folds away, and starts folded.
+  const secHead = (n, title, sub) => `<header class="bsec-head"${n > 1 ? ' data-fold role="button" tabindex="0"' : ''}><span class="step">${n}</span><div><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div>${n > 1 ? ui('down', 18) : ''}</header>`;
 
   function drawKind() {
     $('#sec-kind').innerHTML = `${secHead(1, 'What to run')}
@@ -975,6 +976,7 @@
     root.addEventListener('click', async (e) => {
       const t = e.target;
       let el;
+      if ((el = t.closest('[data-fold]'))) { el.closest('.bsec').classList.toggle('shut'); return; }
       if ((el = t.closest('[data-kind]'))) {
         const k = el.dataset.kind;
         B.kind = k === 'sim' ? 'sim' : 'game';
@@ -1037,6 +1039,7 @@
         saveB(); drawSummary(); return;
       }
     });
+    root.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-fold]')) { e.preventDefault(); e.target.closest('.bsec').classList.toggle('shut'); } });
     root.addEventListener('change', (e) => {
       const t = e.target;
       if (t.dataset.bind) { B[t.dataset.bind] = t.value; if (t.dataset.bind === 'human') drawPlayers(); }
