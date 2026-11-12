@@ -6,53 +6,196 @@
     <title>goosepipe</title>
     <link rel="icon" type="image/png" href="Logo2.png" />
     <style>
+      :root {
+        --bg: #3595bf;
+        --goose: clamp(72px, 10vmin, 500px);
+        --radius: calc(var(--goose) * 1.2);
+      }
+
       body {
         margin: 0;
         padding: 0;
-        background-color: #3595bf;
+        background-color: var(--bg);
         height: 100vh;
+        height: 100dvh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* The hub is the disc the ring sits on; the menu stays open while the mouse is inside it. */
+      .hub {
+        position: relative;
+        width: calc(var(--radius) * 2);
+        height: calc(var(--radius) * 2);
+        border-radius: 50%;
         display: flex;
         justify-content: center;
         align-items: center;
       }
 
-      .logo {
-        max-width: 10%;
-        max-height: 10%;
-        object-fit: contain;
+      .goose {
+        position: relative;
+        z-index: 1;
+        width: var(--goose);
+        height: var(--goose);
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: none;
         cursor: pointer;
+        transition: transform 0.2s;
+      }
+
+      .goose:active {
+        transform: scale(0.94);
+      }
+
+      .goose img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      .ring {
+        position: absolute;
+        inset: 0;
+        box-sizing: border-box;
+        border: 1.5px dashed rgba(255, 255, 255, 0.6);
+        border-radius: 50%;
+        visibility: hidden;
+        opacity: 0;
+        transform: scale(0.45) rotate(-25deg);
+        transition:
+          transform 0.4s cubic-bezier(0.3, 1.3, 0.5, 1),
+          opacity 0.25s,
+          visibility 0s 0.25s;
+      }
+
+      .hub.open .ring {
+        visibility: visible;
+        opacity: 1;
+        transform: none;
+        transition-delay: 0s;
+      }
+
+      /* Links spread evenly round the ring, starting at the top: set --n on the ring and --i on each link. */
+      .ring a {
+        --angle: calc(360deg * var(--i) / var(--n));
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--radius) * -1))
+          rotate(calc(var(--angle) * -1));
+        padding: 0.3em 0.75em;
+        background: var(--bg);
+        color: #fff;
+        font-size: clamp(14px, 1.7vmin, 20px);
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+        text-decoration: none;
+      }
+
+      .ring a:hover,
+      .ring a:focus-visible {
+        text-decoration: underline;
+        text-underline-offset: 0.3em;
+      }
+
+      .goose:focus-visible,
+      .ring a:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .goose,
+        .ring {
+          transition: none;
+        }
       }
     </style>
   </head>
   <body>
-    <img src="Logo1.png" alt="goosepipe logo" class="logo" id="goose-logo" />
+    <div class="hub" id="hub">
+      <nav class="ring" id="goose-menu" aria-label="Projects" style="--n: 2">
+        <a href="meowfia/" style="--i: 0">meowfia</a>
+        <a href="tama/" style="--i: 1">tama</a>
+      </nav>
+      <button class="goose" id="goose-logo" type="button" aria-label="goosepipe projects" aria-expanded="false" aria-controls="goose-menu">
+        <img src="Logo1.png" alt="" draggable="false" />
+      </button>
+    </div>
     <audio id="goose-sound" preload="auto">
       <source src="sound.mp3" type="audio/mpeg">
     </audio>
-    
+
     <script>
+      const hub = document.getElementById('hub');
       const gooseLogo = document.getElementById('goose-logo');
       const gooseSound = document.getElementById('goose-sound');
-      
+
+      // Menu: a mouse opens it by hovering the goose and closes it by leaving the ring;
+      // touch and keyboard toggle it by pressing the goose.
+      let lastPointerType = '';
+
+      function setOpen(open) {
+        hub.classList.toggle('open', open);
+        gooseLogo.setAttribute('aria-expanded', String(open));
+      }
+
+      gooseLogo.addEventListener('pointerenter', function (e) {
+        if (e.pointerType === 'mouse') setOpen(true);
+      });
+
+      hub.addEventListener('pointerleave', function (e) {
+        if (e.pointerType === 'mouse') setOpen(false);
+      });
+
+      document.addEventListener('pointerdown', function (e) {
+        lastPointerType = e.pointerType;
+        if (!hub.contains(e.target)) setOpen(false);
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setOpen(false);
+      });
+
+      // Coming back with the browser's back button shouldn't show a stale open menu.
+      window.addEventListener('pageshow', function (e) {
+        if (e.persisted) setOpen(false);
+      });
+
       let clickCount = 0;
       let lastClickTime = 0;
-      
-      gooseLogo.addEventListener('click', function() {
+
+      gooseLogo.addEventListener('click', function (e) {
+        // e.detail is 0 for keyboard activation; a real mouse click already has the menu open from hover.
+        if (lastPointerType !== 'mouse' || e.detail === 0) {
+          setOpen(!hub.classList.contains('open'));
+        }
+
         const now = new Date().getTime();
-        
+
         if (now - lastClickTime < 500) {
           clickCount++;
         } else {
           clickCount = 1;
         }
-        
+
         lastClickTime = now;
-        
+
         if (clickCount === 10) {
           window.open('https://www.youtube.com/watch?v=u08E7c-FRbU', '_blank');
           clickCount = 0;
         }
-        
+
         gooseSound.currentTime = 0;
         gooseSound.play();
       });
