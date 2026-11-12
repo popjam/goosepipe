@@ -968,7 +968,7 @@
   }
   function showMonitor() {
     const box = $('#monitor'), st = R.status; if (!box || !st) return;
-    const run = st.running;
+    const runs = st.runs || (st.running ? [st.running] : []), run = runs[0];
     const badge = { queued: pill('Queued', 'muted'), done: pill('Finished', 'farm'), stopped: pill('Stopped', 'yolk'), failed: pill('Failed', 'cat') };
     const item = (r) => `<li class="qitem">${badge[r.state] || ''}<div class="qitem-text">${runLine(r)}${r.message ? `<small>${esc(r.message)}</small>` : ''}</div>
       ${r.state === 'queued' ? `<button type="button" class="btn small" data-stop="${esc(r.id)}">Remove</button>` : ''}
@@ -976,10 +976,10 @@
       ${r.state === 'done' ? `<a class="btn small" href="#/${r.type === 'sim' ? 'sim' : 'game'}/${encodeURIComponent(r.id)}">Open</a>` : ''}</li>`;
     const tailKey = run && run.tail ? run.tail.length + '|' + run.tail[run.tail.length - 1] : '';
     const liveEl = $('#live'), stick = !liveEl || liveEl.scrollTop + liveEl.clientHeight >= liveEl.scrollHeight - 30;
-    box.innerHTML = `${run ? `<section class="live-run"><div class="live-head"><span class="pulse"></span><div class="qitem-text">${runLine(run)}</div>${run.human ? `<a class="btn small primary" href="#/play/${encodeURIComponent(run.id)}">Play</a>` : ''}<button type="button" class="btn small danger" data-stop="${esc(run.id)}">${ui('stop', 14)}Stop</button></div>
-        <div class="progress" role="progressbar" aria-valuenow="${Math.round((run.progress || 0) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round((run.progress || 0) * 100)}%"></i></div>
-        <div class="live-meta"><span>${esc(run.phase || 'Starting')}</span><span>${esc(run.elapsed || '')}${run.calls ? ' · ' + run.calls + ' turns' : ''}</span></div>
-        ${run.tail && run.tail.length ? `<div class="live" id="live" data-key="${esc(tailKey)}">${run.tail.map((l) => `<p>${esc(l)}</p>`).join('')}</div>` : ''}</section>` : ''}
+    box.innerHTML = `${runs.map((x, i) => `<section class="live-run"><div class="live-head"><span class="pulse"></span><div class="qitem-text">${runLine(x)}</div>${x.human ? `<a class="btn small primary" href="#/play/${encodeURIComponent(x.id)}">Play</a>` : ''}<button type="button" class="btn small danger" data-stop="${esc(x.id)}">${ui('stop', 14)}Stop</button></div>
+        <div class="progress" role="progressbar" aria-valuenow="${Math.round((x.progress || 0) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round((x.progress || 0) * 100)}%"></i></div>
+        <div class="live-meta"><span>${esc(x.phase || 'Starting')}</span><span>${esc(x.elapsed || '')}${x.calls ? ' · ' + x.calls + ' turns' : ''}</span></div>
+        ${x.tail && x.tail.length ? (i === 0 && runs.length === 1 ? `<div class="live" id="live" data-key="${esc(tailKey)}">${x.tail.map((l) => `<p>${esc(l)}</p>`).join('')}</div>` : `<p class="live-last">${esc(x.tail[x.tail.length - 1])}</p>`) : ''}</section>`).join('')}
       ${st.queue.length ? `<section class="queue"><h3>Up next</h3><ul>${st.queue.map(item).join('')}</ul></section>` : ''}
       ${st.recent.length ? `<details class="queue recent"${run || st.queue.length ? '' : ''}><summary><h3>Recent runs</h3>${ui('down', 16)}</summary><ul>${st.recent.slice(0, 8).map(item).join('')}</ul></details>` : ''}`;
     const live = $('#live'); if (live && stick) live.scrollTop = live.scrollHeight;
