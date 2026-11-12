@@ -405,7 +405,7 @@
       else if (e.k === 'system') { if (!e.text.startsWith('Nest sizes:')) h += `<div class="sys">${esc(e.text)}</div>`; }
       else if (e.k === 'say') {
         const hide = e.anon && !canSee(e.p);
-        h += `<div class="msg">${hide ? '<span class="av anon">?</span>' : av(g, e.p, people[e.p])}<div class="msg-body"><div class="msg-from">${hide ? 'Someone' : esc(e.p)}${e.anon ? pill('eyes shut', 'flower') : ''}</div><div class="bubble">${esc(e.text)}</div>${thought(e, e.p)}</div></div>`;
+        h += `<div class="msg">${hide ? '<span class="av anon">?</span>' : av(g, e.p, people[e.p])}<div class="msg-body"><div class="msg-from">${hide ? 'Someone' : esc(e.p)}${e.anon ? pill('eyes shut', 'flower') : ''}${e.bids && !hide ? ` <small>bids: ${Object.entries(e.bids).sort((x, y) => y[1] - x[1]).map(([n, v]) => `${esc(n)} ${v}`).join(' · ')}</small>` : ''}</div><div class="bubble">${esc(e.text)}</div>${thought(e, e.p)}</div></div>`;
       } else if (e.k === 'whisper') {
         if (canSee(e.p) || canSee(e.to)) h += `<div class="msg whisper">${av(g, e.p, people[e.p])}<div class="msg-body"><div class="msg-from">${esc(e.p)}${pill('whispers to ' + esc(e.to), 'flower')}</div><div class="bubble">${esc(e.text)}</div>${thought(e, e.p)}</div></div>`;
       } else if (e.k === 'quiet') {
