@@ -196,30 +196,47 @@
     }
     return ['skip', 'Nobody out'];
   }
+  // The games list: a title, tags you can filter by, and the cards that were in play.
+  const GL = { q: '', tags: [] };
+  const BASICS = ['deck.roles', 'deck.flowers', 'game.start_pool', 'game.pool_reveal', 'game.max_meowfia'];
+  function gameTags(g) {                         // the "basics only" setup is one tag, not five
+    let o = g.overrides || [];
+    const t = (D.meta.setups || {}).testing, at = (k) => { const x = o.find((y) => parseOverride(y)[0] === k); return x ? parseOverride(x)[1] : undefined; };
+    const basics = t && Array.isArray(at('game.start_pool')) && sameSet(at('game.start_pool'), t.start_pool) && Array.isArray(at('deck.roles')) && sameSet(at('deck.roles'), t.roles);
+    if (basics) o = o.filter((y) => !BASICS.includes(parseOverride(y)[0]) || (parseOverride(y)[0] === 'deck.flowers' && at('deck.flowers').length));
+    return [g.variant, modelsOf(g), `${g.players.length} players`, ...(basics ? ['Basics only'] : []), ...o.map(describe).filter(Boolean)];
+  }
+  const gamePool = (g) => (g.pool || [...new Set(g.rounds.flatMap((r) => r.revealed))]).filter((n) => D.card[n] && !D.card[n].buffer);
   function gameCard(g) {
-    const top = Object.entries(g.scores).sort((a, b) => b[1] - a[1]);
     const title = g.headline || `${g.players.length} players, ${plural(g.rounds.length, 'round')}`;
-    return `<a class="gcard" href="#/game/${encodeURIComponent(g.id)}">
-      <div class="gcard-meta"><span>${when(g.started, true)}</span><span>${esc(g.variant)}</span><span>${g.players.length} players</span><span>${esc(modelsOf(g))}</span>${changesPill(g.overrides)}</div>
-      <h2>${esc(title)}</h2>
-      ${g.summary ? `<p class="gcard-sum">${esc(g.summary)}</p>` : ''}
-      <div class="gcard-rounds">${g.rounds.map((r) => { const [cls, text] = outcome(r); return `<span class="rpill ${cls}"><b>R${r.round}</b>${esc(text)}</span>`; }).join('')}</div>
-      <div class="gcard-foot"><span class="winner">${ui('scores', 16)}<b>${esc(list(g.winners || [top[0][0]]))}</b> won with ${top[0][1]}</span>
-        ${g.review ? `<span class="mini-scores">${REVIEW.slice(0, 3).map((k) => `<span>${cap(k)} <b>${g.review[k] ?? '–'}</b></span>`).join('')}</span>` : ''}</div></a>`;
+    return `<article class="gcard game"><div class="gcard-meta"><span>${when(g.started, true)}</span></div>
+      <h2><a href="#/game/${encodeURIComponent(g.id)}">${esc(title)}</a></h2>
+      <div class="gcard-tags">${gameTags(g).map((t, i) => `<button type="button" class="pill tag${i > 2 ? ' yolk' : ''}${GL.tags.includes(t) ? ' on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <div class="gcard-pool">${gamePool(g).map(cdot).join('')}</div></article>`;
   }
   function viewGames() {
-    page(`<header class="page-head"><h1>Games</h1><p>AI players sit down to Meowfia, bluff, deduce and throw eggs. Open a game to read it like you were at the table.</p></header>
-      ${D.games.length ? `<div class="glist">${D.games.map(gameCard).join('')}</div>` : `<div class="empty"><b>No games yet.</b><span>Start the first one from the run page.</span><a class="btn primary" href="#/run">New run</a></div>`}`);
+    page(`<header class="page-head"><h1>Games</h1></header>
+      ${D.games.length ? `<div class="gfilter"><label class="search">${ui('search', 18)}<input type="search" id="gq" placeholder="Search titles, tags, animals or players" value="${esc(GL.q)}" autocomplete="off" aria-label="Search games"></label><div class="gactive" id="gactive"></div></div><div class="glist" id="glist"></div>` : `<div class="empty"><b>No games yet.</b><span>Start the first one from the run page.</span><a class="btn primary" href="#/run">New run</a></div>`}`);
+    if (!D.games.length) return;
+    const draw = () => {
+      const q = GL.q.trim().toLowerCase();
+      const items = D.games.filter((g) => { const tags = gameTags(g); return GL.tags.every((t) => tags.includes(t)) && (!q || [g.headline || '', ...tags, ...gamePool(g), ...g.players].join(' ').toLowerCase().includes(q)); });
+      $('#glist').innerHTML = items.map(gameCard).join('') || '<p class="muted">No games match.</p>';
+      $('#gactive').innerHTML = GL.tags.map((t) => `<button type="button" class="pill tag on" data-tag="${esc(t)}">${esc(t)}<b>×</b></button>`).join('') + (GL.tags.length || q ? `<span class="fine">${plural(items.length, 'game')}</span>` : '');
+    };
+    draw();
+    $('#gq').oninput = (e) => { GL.q = e.target.value; draw(); };
+    $('.page').onclick = (e) => { const b = e.target.closest('[data-tag]'); if (!b) return; const t = b.dataset.tag; GL.tags = GL.tags.includes(t) ? GL.tags.filter((x) => x !== t) : [...GL.tags, t]; draw(); };
   }
 
   /* ================= one game ================= */
   // view: 'all' shows every secret; 'table' shows only what the table saw; a player's name shows what they saw.
-  const G = { game: null, tab: 'overview', view: store.get('view', 'all'), revealed: new Set() };
+  const G = { game: null, tab: 'overview', view: store.get('view', 'all'), revealed: new Set(), open: new Set() };
   async function viewGame(id, tab) {
     if (!G.game || G.game.id !== id) {
       page('<div class="loading" role="status">Loading the game</div>');
       try { G.game = await getData(`games/${id}.json`); } catch (e) { page('<div class="empty"><b>This game could not be loaded.</b><a class="btn" href="#/">Back to the games</a></div>'); return; }
-      G.revealed = new Set();
+      G.revealed = new Set(); G.open = new Set();
       if (!['all', 'table'].includes(G.view)) G.view = 'all';
     }
     G.tab = tab || 'overview';
@@ -257,8 +274,23 @@
       const b = e.target.closest('[data-reveal]');
       if (b) { G.revealed.add(b.dataset.reveal === 'all' ? 'all' : +b.dataset.reveal); const y = window.scrollY; renderGame(); window.scrollTo(0, y); return; }
       const j = e.target.closest('[data-jump]');
-      if (j) { const el = document.getElementById(j.dataset.jump); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      if (j) { const el = document.getElementById(j.dataset.jump); if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
+      const ps = e.target.closest('[data-pin-step]');
+      if (ps) {                                    // the pinned table: step to an earlier or later moment of the round
+        const pin = ps.closest('.pin'), st = $$('.pin-stage', pin), cur = st.findIndex((x) => !x.hidden);
+        const nx = Math.max(0, Math.min(st.length - 1, cur + +ps.dataset.pinStep));
+        st[cur].hidden = true; st[nx].hidden = false;
+        $('.pin-bar b', pin).textContent = st[nx].dataset.label;
+        $$('[data-pin-step]', pin).forEach((b) => { b.disabled = +b.dataset.pinStep < 0 ? nx === 0 : nx === st.length - 1; });
+        drawLines();
+      }
     };
+    body.ontoggle = null;
+    body.addEventListener('toggle', (e) => {       // a phase was opened or closed
+      const d = e.target; if (!d.classList || !d.classList.contains('phase')) return;
+      if (d.open) G.open.add(G.tab + d.id); else G.open.delete(G.tab + d.id);
+      drawLines();
+    }, true);
     const on = $('#tabs .on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
     drawLines();
   }
@@ -322,7 +354,7 @@
         <span class="seat-face">${av(g, name, show ? p : { dead: p.dead }, 'l')}${p.nest !== undefined ? `<span class="nest" title="Cards in nest">${p.nest}</span>` : ''}</span>
         <span class="seat-name">${esc(name)}</span>${sub ? `<span class="seat-sub">${sub}</span>` : ''}</button>`;
     }).join('');
-    return `<div class="table" data-arrows="${esc(JSON.stringify(opts.arrows || []))}"><div class="felt"><span>${esc(opts.label || '')}</span></div><svg class="lines" aria-hidden="true"></svg>${seats}</div>`;
+    return `<div class="table ${opts.cls || ''}" data-arrows="${esc(JSON.stringify(opts.arrows || []))}"><div class="felt"><span>${esc(opts.label || '')}</span></div><svg class="lines" aria-hidden="true"></svg>${seats}</div>`;
   }
   function drawLines() {
     const css = getComputedStyle(document.documentElement);
@@ -438,6 +470,8 @@
     }).join('')}</div>
       <div class="inpool"><span class="label">Animals in the pool</span>${rec.pool.map((a) => cchip(a)).join('')}</div>`;
     const startPeople = Object.fromEntries(g.players.map((n) => [n, { ...start[n], nest: start[n].hand.length }]));
+    // every moment of the round as a table, for the window pinned beside the day's talk
+    const stages = [{ label: 'The deal', html: table(g, R, startPeople, { show: see, label: 'Deal' }) }];
     const deal = `<div class="castgrid">${g.players.map((n) => {
       const p = start[n], v = see(n);
       return `<button type="button" class="pcard${v ? ' ' + sideClass(p.alignment) : ''}" data-seat="${esc(n)}"${v ? ` data-card="${esc(p.role)}"` : ''}>${av(g, n, v ? p : null, 'l')}
@@ -465,6 +499,7 @@
           if (v) arrows.push({ from: n, to: v, kind: 'visit' });
         }
         const thinking = Object.entries(night.choices).filter(([n, c]) => see(n) && c.note);
+        stages.push({ label, html: table(g, R, startPeople, { show: see, arrows, label: 'Night' }) });
         add('night', label, 'night', 'Who visited whom', `<div class="split"><div class="split-a">${table(g, R, startPeople, { show: see, arrows, label: 'Night' })}
             <div class="legend"><span><i class="lg visit"></i>Visit</span><span><i class="lg dim"></i>Meant to go</span><span><i class="lg nestk"></i>Cards in nest</span></div></div>
           <div class="split-b">${nightEvents(g, night, seen(start), see)}</div></div>
@@ -477,7 +512,9 @@
         + ((cyc.night_deaths || []).length ? `<div class="sys death">${esc(list(cyc.night_deaths))} ${cyc.night_deaths.length === 1 ? 'was' : 'were'} found dead in the morning.</div>` : ''));
       if (rec.skipped && ci === rec.cycles.length - 1) { add('day', 'Day' + again, 'day', '', dayLog(g, cyc.day || [], dayPeople, see)); return; }
       const says = (cyc.day || []).filter((e) => e.k === 'say').length;
-      add('day', 'Day' + again, 'day', plural(says, 'message'), `<div class="nests"><span class="label">Nests</span>${g.players.map((n) => `<span class="nestpill">${dot(g, n)}${esc(n)} <b>${after[n].hand.length}</b></span>`).join('')}</div>${dayLog(g, cyc.day || [], dayPeople, see)}`);
+      const dayTable = Object.fromEntries(g.players.map((n) => [n, { ...after[n], nest: after[n].hand.length }]));
+      stages.push({ label: 'Day' + again, html: table(g, R, dayTable, { show: see, label: 'Day' }) });
+      add('day', 'Day' + again, 'day', plural(says, 'message'), `<div class="daysplit"><div>${dayLog(g, cyc.day || [], dayPeople, see)}</div>%%PIN${stages.length - 1}%%</div>`);
       if (cyc.beliefs && Object.keys(cyc.beliefs).length) add('minds', 'Suspicions', 'minds', 'Asked in private before the vote', s ? susGrid(g, cyc, truth, dayPeople) : '<div class="locked">' + ui('minds', 22) + '<b>What everyone privately believed</b><span>is revealed with the round.</span></div>');
       const v = cyc.vote;
       if (v) {
@@ -490,7 +527,9 @@
         else if (!v.eliminated.length) verdict = '<div class="verdict none"><div><b>Nobody was eggsecuted.</b></div></div>';
         else if (!s) verdict = `<div class="verdict none"><div><b>${esc(list(v.eliminated))} ${v.eliminated.length > 1 ? 'are' : 'is'} eggsecuted.</b><span>A cat, or not? Make your guess, then reveal.</span></div><button class="btn primary" data-reveal="${R}">Reveal round ${R}</button></div>`;
         else verdict = v.eliminated.map((e) => { const a = v.revealed[e]; const none = Object.values(truth).every((x) => x === 'Farm'); return `<div class="verdict ${a === 'Meowfia' ? 'farm' : 'cat'}">${av(g, e, endPeople[e], 'l')}<div><b>${esc(e)} was ${a === 'Meowfia' ? 'a cat' : 'Farm'}.</b><span>${a === 'Meowfia' ? 'Farm wins the round.' : none ? 'There were no cats at all, so everyone loses their thrown eggs.' : 'Meowfia wins the round.'}${v.goose ? ' The Goose is in the pool, so winners and losers swap.' : ''}${v.corpse ? ' The Corpse Flower kept this hidden from the table.' : ''}</span></div></div>`; }).join('');
-        add('vote', 'Vote' + again, 'vote', 'Who threw eggs at whom', `<div class="split"><div class="split-a">${table(g, R, endPeople, { show: see, arrows, out: v.eliminated, label: 'Eggsecution', sub: (n) => (v.tally[n] ? plural(v.tally[n], 'vote') : '') })}
+        const voteTable = table(g, R, endPeople, { show: see, arrows, out: v.eliminated, label: 'Eggsecution', sub: (n) => (v.tally[n] ? plural(v.tally[n], 'vote') : '') });
+        stages.push({ label: 'Vote' + again, html: voteTable });
+        add('vote', 'Vote' + again, 'vote', 'Who threw eggs at whom', `<div class="split"><div class="split-a">${voteTable}
             <div class="legend"><span><i class="lg vote"></i>Thrown eggs, with how many</span></div></div>
           <ul class="throws split-b">${Object.entries(v.throws).map(([n, t]) => {
             const res = (v.results || {})[n];
@@ -510,8 +549,9 @@
     const idx = g.rounds.indexOf(rec);
     const prev = idx > 0 ? [gameHref(g, 'r' + g.rounds[idx - 1].round), 'Round ' + g.rounds[idx - 1].round] : [gameHref(g), 'Overview'];
     const next = idx < g.rounds.length - 1 ? [gameHref(g, 'r' + g.rounds[idx + 1].round), 'Round ' + g.rounds[idx + 1].round] : [gameHref(g), 'Overview'];
+    const pin = (k) => `<aside class="pin"><div class="pin-bar"><button type="button" class="icon-btn" data-pin-step="-1" aria-label="Earlier in the round" ${k === 0 ? 'disabled' : ''}>${ui('back', 18)}</button><b>${esc(stages[k].label)}</b><button type="button" class="icon-btn" data-pin-step="1" aria-label="Later in the round" ${k === stages.length - 1 ? 'disabled' : ''}>${ui('next', 18)}</button></div>${stages.map((st, i) => `<div class="pin-stage" data-label="${esc(st.label)}" ${i === k ? '' : 'hidden'}>${st.html}</div>`).join('')}</aside>`;
     return `<div class="jump" id="jump">${sections.map((x) => `<button type="button" data-jump="${x.id}">${ui(x.ic, 15)}${esc(x.label)}</button>`).join('')}</div>
-      ${sections.map((x, i) => `<section class="phase" id="${x.id}"><header class="phase-head"><span class="phase-ic">${ui(x.ic, 18)}</span><h2>${esc(x.label)}</h2>${x.hint ? `<span class="phase-hint">${esc(x.hint)}</span>` : ''}</header>${x.html}</section>`).join('')}
+      ${sections.map((x) => `<details class="phase" id="${x.id}" ${G.open.has(G.tab + x.id) ? 'open' : ''}><summary class="phase-head"><span class="phase-ic">${ui(x.ic, 18)}</span><h2>${esc(x.label)}</h2>${x.hint ? `<span class="phase-hint">${esc(x.hint)}</span>` : ''}${ui('down', 18)}</summary>${x.html.replace(/%%PIN(\d+)%%/, (m, k) => pin(+k))}</details>`).join('')}
       ${s ? '' : `<div class="spoiler"><div><b>Finished round ${R}?</b><span>Reveal who was what, what happened at night and what everyone was thinking.</span></div><button class="btn primary" data-reveal="${R}">Reveal round ${R}</button></div>`}
       <nav class="pager"><a class="btn" href="${prev[0]}">${ui('back', 16)}${prev[1]}</a><a class="btn primary" href="${next[0]}">${next[1]}${ui('next', 16)}</a></nav>`;
   }
@@ -696,7 +736,8 @@
   const MODEL_NOTE = { haiku: 'Fast and light on usage. Misreads rules more often.', sonnet: 'Plays well. The usual choice.', opus: 'Sharper deduction. Heavy on usage.', fable: 'The strongest player. Heaviest on usage.' };
   const blank = () => ({ kind: 'game', variant: '', players: null, rounds: null, seed: '', games: 500, model: 'sonnet', effort: '', review: 'opus', probes: true, human: '', opponents: 'claude', seats: {}, seatRounds: 'all', roles: null, flowers: null, startPool: [], reveals: [], rules: {}, raw: '' });
   let B = Object.assign(blank(), store.get('builder', {}));
-  const R = { status: null, state: 'checking', cardTab: 'roles', q: '' };
+  const R = { status: null, state: 'checking', cardTab: 'roles', q: '', go: false };
+  const isPlay = () => B.kind === 'game' && seatNames().includes(B.human);
   const saveB = () => store.set('builder', B);
   const variantOf = () => D.variants.find((v) => v.name === B.variant) || D.variants[0];
   const baseVal = (key) => getPath(variantOf().settings, key);
@@ -730,7 +771,7 @@
   function payload() {
     const seat_models = {};
     for (const n of seatNames()) { const m = (B.seats[n] || {}).model; if (m && m !== B.model) seat_models[n] = m; }
-    const human = B.kind === 'game' && seatNames().includes(B.human) ? B.human : null;
+    const human = isPlay() ? B.human : null;
     return { type: B.kind, variant: variantOf().name, players: nPlayers(), rounds: nRounds(), seed: B.seed === '' ? null : +B.seed, human, opponents: human && B.opponents === 'random' ? 'random' : 'claude', model: B.model, effort: B.effort || null, review_model: B.review, probes: B.probes, games: B.games, seat_models, set: overridesOf() };
   }
   function command() {
@@ -747,7 +788,7 @@
     if (!B.variant || !D.variants.find((v) => v.name === B.variant)) B.variant = D.variants[0].name;
     if (query.get('variant') && D.variants.find((v) => v.name === query.get('variant'))) { B.variant = query.get('variant'); B.rules = {}; B.roles = B.flowers = null; saveB(); }
     if (query.get('c')) {                          // a setup handed over from the public site
-      try { B = Object.assign(blank(), JSON.parse(decodeURIComponent(escape(atob(query.get('c').replace(/-/g, '+').replace(/_/g, '/')))))); saveB(); toast('Setup loaded. Check it and start the run.'); } catch { toast('That setup link could not be read.', true); }
+      try { B = Object.assign(blank(), JSON.parse(decodeURIComponent(escape(atob(query.get('c').replace(/-/g, '+').replace(/_/g, '/')))))); saveB(); R.go = !!query.get('go'); if (!R.go) toast('Setup loaded. Check it and start the run.'); } catch { toast('That setup link could not be read.', true); }
       history.replaceState(null, '', '#/run');
     }
     document.title = 'New run · Meowfia Lab';
@@ -773,6 +814,7 @@
       R.state = 'ok'; box.innerHTML = '';
       showMonitor(); drawSummary();
       poll = setInterval(refresh, 2500);
+      if (R.go) { R.go = false; start(); }         // handed over from the public site with "start it": no second press
     } catch (e) {
       R.state = 'down';
       box.innerHTML = `<div class="notice bad">${ui('info', 18)}<div><b>Can't reach the PC.</b><span>Turn on Tailscale on this device and check the PC is on. Everything else on the site works without it.</span></div><button type="button" class="btn small" id="retry">Try again</button></div>`;
@@ -819,7 +861,7 @@
 
   function drawKind() {
     $('#sec-kind').innerHTML = `${secHead(1, 'What to run')}
-      <div class="choice2">${[['game', 'Real game', 'Claude plays every seat. You get a full replay, private reasoning and a written review. Takes a few minutes and uses your subscription.'], ['sim', 'Simulation set', 'Hundreds of random-bot games in seconds, reported as statistics about the mechanics. Free.']].map(([k, t, d]) => `<button type="button" class="choice${B.kind === k ? ' on' : ''}" data-set="kind" data-value="${k}" aria-pressed="${B.kind === k}"><span class="choice-ic">${ui(k === 'game' ? 'games' : 'sims', 22)}</span><b>${t}</b><span>${d}</span></button>`).join('')}</div>`;
+      <div class="choice2 three">${[['game', 'Watch a game', 'Claude plays every seat. You get a full replay, private reasoning and a written review. Takes a few minutes and uses your subscription.', 'games'], ['play', 'Play a game', 'You take a seat and play from this device, against Claude or against practice bots.', 'run'], ['sim', 'Simulation set', 'Hundreds of random-bot games in seconds, reported as statistics about the mechanics. Free.', 'sims']].map(([k, t, d, ic]) => { const on = (B.kind === 'sim' ? 'sim' : isPlay() ? 'play' : 'game') === k; return `<button type="button" class="choice${on ? ' on' : ''}" data-kind="${k}" aria-pressed="${on}"><span class="choice-ic">${ui(ic, 22)}</span><b>${t}</b><span>${d}</span></button>`; }).join('')}</div>`;
   }
   function drawGame() {
     $('#sec-game').innerHTML = `${secHead(2, 'The game')}
@@ -844,8 +886,8 @@
     const anyFixed = names.some((n) => (B.seats[n] || {}).role || (B.seats[n] || {}).side);
     const nSet = names.filter((n) => { const x = B.seats[n] || {}; return x.role || x.side || (B.kind === 'game' && x.model); }).length;
     box.innerHTML = `${secHead(3, 'The players', B.kind === 'game' ? 'Who plays, and anything you want to fix about a seat.' : 'Fix a seat\'s animal or side to test a matchup.')}
-      ${B.kind === 'game' ? `<div class="frow"><div class="flabel"><b>Your seat</b><span>${B.human ? `You play ${esc(B.human)} from this device. The others wait for you on your turn.` : 'Watch the game, or take a seat and play it yourself.'}</span></div><select data-bind="human" class="auto"><option value="">Just watch</option>${names.map((n) => `<option value="${n}" ${B.human === n ? 'selected' : ''}>Play as ${n}</option>`).join('')}</select></div>${B.human ? `<div class="frow"><div class="flabel"><b>Your opponents</b><span>${B.opponents === 'random' ? 'Random bots answer at once and cost nothing. Good for learning the screens, not for a real game.' : 'Claude plays the other seats.'}</span></div><div class="seg">${[['claude', 'Claude'], ['random', 'Practice bots']].map(([k, l]) => `<button type="button" class="${B.opponents === k ? 'on' : ''}" data-set="opponents" data-value="${k}">${l}</button>`).join('')}</div></div>` : ''}` : ''}
-      ${B.kind === 'game' && !(B.human && B.opponents === 'random') ? `<div class="frow"><div class="flabel"><b>Model for the table</b><span>${MODEL_NOTE[B.model]}</span></div><div class="seg">${MODELS.map((m) => `<button type="button" class="${B.model === m ? 'on' : ''}" data-set="model" data-value="${m}">${MODEL[m]}</button>`).join('')}</div></div>
+      ${isPlay() ? `<div class="frow"><div class="flabel"><b>Your seat</b><span>The others wait for you on your turn.</span></div><select data-bind="human" class="auto">${names.map((n) => `<option value="${n}" ${B.human === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div><div class="frow"><div class="flabel"><b>Your opponents</b><span>${B.opponents === 'random' ? 'Random bots answer at once and cost nothing. Good for learning the screens, not for a real game.' : 'Claude plays the other seats.'}</span></div><div class="seg">${[['claude', 'Claude'], ['random', 'Practice bots']].map(([k, l]) => `<button type="button" class="${B.opponents === k ? 'on' : ''}" data-set="opponents" data-value="${k}">${l}</button>`).join('')}</div></div>` : ''}
+      ${B.kind === 'game' && !(isPlay() && B.opponents === 'random') ? `<div class="frow"><div class="flabel"><b>Model for the table</b><span>${MODEL_NOTE[B.model]}</span></div><div class="seg">${MODELS.map((m) => `<button type="button" class="${B.model === m ? 'on' : ''}" data-set="model" data-value="${m}">${MODEL[m]}</button>`).join('')}</div></div>
       <div class="fgrid">
         <label class="fcell"><b>Thinking effort</b><select data-bind="effort">${[['', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']].map(([k, l]) => `<option value="${k}" ${B.effort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label class="fcell"><b>Review written by</b><select data-bind="review">${[...MODELS, 'none'].map((m) => `<option value="${m}" ${B.review === m ? 'selected' : ''}>${m === 'none' ? 'Nobody (skip)' : MODEL[m]}</option>`).join('')}</select></label>
@@ -866,7 +908,7 @@
     $('#sec-cards').innerHTML = `${secHead(4, 'The cards', 'Which cards can turn up, and any you want to see for certain.')}
       <div class="cardtools"><div class="seg" id="cardtab">${[['roles', 'Animals'], ['flowers', 'Flowers']].map(([x, l]) => `<button type="button" class="${k === x ? 'on' : ''}" data-cardtab="${x}">${l}<small>${deckList(x).length}/${allOf(x).length}</small></button>`).join('')}</div>
         <label class="search">${ui('search', 18)}<input type="search" id="tq" placeholder="Find a card" value="${esc(R.q)}" autocomplete="off" aria-label="Find a card"></label></div>
-      <div class="quick"><button type="button" class="link" data-act="deck-all">All on</button><button type="button" class="link" data-act="deck-none">All off</button>${k === 'roles' ? '<button type="button" class="link" data-act="deck-farm">Farm only</button><button type="button" class="link" data-act="deck-cats">Cats only</button>' : ''}${B[k] ? '<button type="button" class="link" data-act="deck-reset">Reset to the version</button>' : ''}<span class="fine">Tap to switch a card on or off. Hold it to read it.</span></div>
+      <div class="quick">${(D.meta.setups || {}).testing ? `<button type="button" class="btn small" data-act="setup-testing" title="${esc(D.meta.setups.testing.help)}">Basics only</button>` : ''}<button type="button" class="link" data-act="deck-all">All on</button><button type="button" class="link" data-act="deck-none">All off</button>${k === 'roles' ? '<button type="button" class="link" data-act="deck-farm">Farm only</button><button type="button" class="link" data-act="deck-cats">Cats only</button>' : ''}${B[k] ? '<button type="button" class="link" data-act="deck-reset">Reset to the version</button>' : ''}<span class="fine">Tap to switch a card on or off. Hold it to read it.</span></div>
       <div class="toggrid" id="toggrid">${tiles || '<p class="muted">No cards match.</p>'}</div>
       ${k === 'roles' ? '<p class="fine">The Pigeon and the House Cat are always in the pool.</p>' : ''}
       <h3 class="sub">Guaranteed cards</h3>
@@ -885,7 +927,7 @@
   function drawRules() {
     const n = Object.keys(B.rules).filter((k) => B.rules[k] !== baseVal(k)).length;
     $('#sec-rules').innerHTML = `${secHead(5, 'The rules', `Every setting, section by section. Switch any of them for this run. ${n ? plural(n, 'setting') + ' changed.' : 'Nothing changed yet.'}`)}
-      ${D.meta.groups.map((g, i) => { const items = D.meta.settings.filter((s) => s.group === g.id); const ch = items.filter((s) => s.key in B.rules && B.rules[s.key] !== baseVal(s.key)).length; return `<details class="rgroup" data-group="${g.id}" ${store.get('rg-' + g.id, i === 0) ? 'open' : ''}><summary><div><b>${esc(g.label)}</b><span>${esc(g.help)}</span></div>${ch ? pill(ch + ' changed', 'yolk') : ''}${ui('down', 18)}</summary>${items.map(control).join('')}</details>`; }).join('')}
+      ${D.meta.groups.map((g) => { const items = D.meta.settings.filter((s) => s.group === g.id); const ch = items.filter((s) => s.key in B.rules && B.rules[s.key] !== baseVal(s.key)).length; return `<details class="rgroup" data-group="${g.id}"><summary><div><b>${esc(g.label)}</b><span>${esc(g.help)}</span></div>${ch ? pill(ch + ' changed', 'yolk') : ''}${ui('down', 18)}</summary>${items.map(control).join('')}</details>`; }).join('')}
       <details class="rgroup" data-group="raw" ${B.raw ? 'open' : ''}><summary><div><b>Anything else</b><span>Settings written by hand, one per line.</span></div>${ui('down', 18)}</summary>
         <textarea id="raw" rows="3" spellcheck="false" placeholder="section.key=value, for example&#10;deck.duplicate_values=[1, 1, 13, 13]">${esc(B.raw)}</textarea></details>`;
   }
@@ -903,16 +945,16 @@
     const p = payload(), ch = p.set.map(describe).filter(Boolean);
     let action, hint = '';
     if (R.state === 'ok') action = `<button type="button" class="btn primary big" data-act="start">${ui('run', 16)}${p.human ? 'Take your seat' : 'Start the run'}</button>`;
-    else if (R.state === 'handover') { action = `<a class="btn primary big" id="handover" href="#">${ui('link', 16)}Continue on your PC</a>`; hint = 'Opens the PC\'s copy of this page with this setup. Needs Tailscale.'; }
+    else if (R.state === 'handover') { action = `<a class="btn primary big" id="handover" href="#">${ui('run', 16)}${p.human ? 'Take your seat' : 'Start the run'}</a>`; hint = 'It starts on your PC, which opens in this tab. Needs Tailscale.'; }
     else if (R.state === 'checking') action = '<button type="button" class="btn primary big" disabled>Looking for the PC…</button>';
     else action = `<button type="button" class="btn primary big" disabled>${R.state === 'down' ? 'The PC is unreachable' : 'Runs are not set up here'}</button>`;
     side.innerHTML = `<div class="sum"><h3>Your run</h3><dl class="facts tight">${summaryLines().map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       ${ch.length ? `<h4>${plural(ch.length, 'change')} from the standard game</h4><ul class="plain sumlist">${ch.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="fine">Standard rules and cards.</p>'}
       ${action}${hint ? `<p class="fine">${hint}</p>` : ''}
-      <div class="sum-more"><button type="button" class="link" data-act="copy">${ui('copy', 14)}Copy command</button>${(D.meta.setups || {}).testing ? `<button type="button" class="link" data-act="setup-testing" title="${esc(D.meta.setups.testing.help)}">${esc(D.meta.setups.testing.label)}</button>` : ''}<button type="button" class="link" data-act="reset">${ui('reset', 14)}Start over</button></div></div>`;
+      <div class="sum-more"><button type="button" class="link" data-act="copy">${ui('copy', 14)}Copy command</button><button type="button" class="link" data-act="reset">${ui('reset', 14)}Start over</button></div></div>`;
     bar.innerHTML = `<div class="startbar-in"><div><b>${p.type === 'sim' ? p.games.toLocaleString() + ' sim games' : 'Real game'}</b><span>${p.players} players · ${plural(p.rounds, 'round')}${ch.length ? ' · ' + plural(ch.length, 'change') : ''}</span></div>${action.replace(' big', '').replace('id="handover"', 'data-handover')}</div>`;
     const enc = btoa(unescape(encodeURIComponent(JSON.stringify(B)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    $$('#handover, [data-handover]').forEach((a) => { a.href = `${D.config.control}/#/run?c=${enc}`; });
+    $$('#handover, [data-handover]').forEach((a) => { a.href = `${D.config.control}/#/run?c=${enc}&go=1`; });
   }
   function drawAll() { drawKind(); drawGame(); drawPlayers(); drawCards(); drawRules(); drawSummary(); }
 
@@ -935,6 +977,12 @@
     root.addEventListener('click', async (e) => {
       const t = e.target;
       let el;
+      if ((el = t.closest('[data-kind]'))) {
+        const k = el.dataset.kind;
+        B.kind = k === 'sim' ? 'sim' : 'game';
+        B.human = k === 'play' ? (seatNames().includes(B.human) ? B.human : seatNames()[0]) : '';
+        saveB(); drawAll(); return;
+      }
       if ((el = t.closest('[data-set]'))) {
         const k = el.dataset.set; let v = el.dataset.value;
         if (k === 'games') v = +v;
@@ -947,7 +995,7 @@
         const s = el.closest('[data-stepper]'), key = s.dataset.stepper, dir = +el.dataset.dir, min = +s.dataset.min, max = +s.dataset.max, step = +s.dataset.step;
         if (key === 'players' || key === 'rounds') {
           B[key] = Math.max(min, Math.min(max, (key === 'players' ? nPlayers() : nRounds()) + dir));
-          drawGame(); drawPlayers(); drawCards();
+          drawKind(); drawGame(); drawPlayers(); drawCards();
         } else {
           const rk = key.slice(5), m = settingMeta(rk), cur = m.kind === 'percent' ? Math.round(val(rk) * 100) : val(rk);
           let next = Math.max(min, Math.min(max, Math.round((cur + dir * step) / step) * step));
@@ -984,7 +1032,7 @@
         else if (a === 'deck-farm' || a === 'deck-cats') { B.roles = allOf('roles').filter((n) => (D.card[n].type === 'farm') === (a === 'deck-farm')); drawCards(); }
         else if (a === 'deck-reset') { B[k] = null; drawCards(); }
         else if (a === 'rule-reset') { delete B.rules[el.dataset.key]; redrawRule(el.dataset.key); if (el.dataset.key === 'game.pool_reveal') drawCards(); }
-        else if (a === 'setup-testing') { const s = D.meta.setups.testing; B.roles = [...s.roles]; B.flowers = [...s.flowers]; B.startPool = [...s.start_pool]; B.reveals = []; for (const [rk, v] of Object.entries(s.rules)) { if (v === baseVal(rk)) delete B.rules[rk]; else B.rules[rk] = v; } drawAll(); toast('Testing setup: no flowers, and a fixed pool of simple animals.'); }
+        else if (a === 'setup-testing') { const s = D.meta.setups.testing; B.roles = [...s.roles]; B.flowers = [...s.flowers]; B.startPool = [...s.start_pool]; B.reveals = []; for (const [rk, v] of Object.entries(s.rules)) { if (v === baseVal(rk)) delete B.rules[rk]; else B.rules[rk] = v; } drawAll(); toast('Basics only: no flowers, and the simple animals.'); }
         else if (a === 'reset') { B = Object.assign(blank(), { variant: D.variants[0].name }); R.q = ''; drawAll(); toast('Back to the standard setup.'); }
         else if (a === 'copy') { try { await navigator.clipboard.writeText(command()); toast('Command copied. Run it in sim/ on the PC.'); } catch { openSheet(`<h2>Command</h2><p class="fine">Run it in the sim folder on the PC.</p><pre class="code">${esc(command())}</pre>`, 'Command'); } return; }
         else if (a === 'start') { start(el); return; }
@@ -1073,7 +1121,7 @@
     Object.assign(P, { id, alive: true, total: 0, token: '', data: null, pendingId: null, sent: null, u: null, hud: '', turnKey: '', items: [], phase: 'Setup', unseen: 0, ghost: '' });
     app.innerHTML = `<div class="play" id="play"><header class="play-top"><a class="icon-btn" href="#/run" aria-label="Leave the table">${ui('back', 20)}</a>
         <div class="play-phase" id="pphase"><b>Meowfia</b><span>Connecting</span></div>
-        <button type="button" class="icon-btn" id="ppool" aria-label="Cards in the pool">${ui('pool', 20)}</button><button type="button" class="icon-btn" id="prules" aria-label="Rules">${ui('rules', 20)}</button></header>
+        <button type="button" class="icon-btn" id="ptable" aria-label="The table and what you did">${ui('eye', 20)}</button><button type="button" class="icon-btn" id="ppool" aria-label="Cards in the pool">${ui('pool', 20)}</button><button type="button" class="icon-btn" id="prules" aria-label="Rules">${ui('rules', 20)}</button></header>
       <div class="play-body"><aside class="hud" id="hud"></aside>
         <section class="play-main"><div class="mhud" id="mhud"></div>
           <div class="feed-wrap"><div class="feed" id="feed"><div class="loading">Taking your seat</div></div>
@@ -1081,6 +1129,7 @@
           <div class="turn" id="turn"></div></section></div></div>`;
     $('#prules').onclick = () => { const v = D.variants.find((x) => x.name === (P.data || {}).variant) || D.variants[0]; openSheet(`<h2>Rules</h2><div class="rules-text flat">${rulesHTML(v.rules)}</div>`, 'Rules'); };
     $('#ppool').onclick = () => { const st = (P.data || {}).state || {}; openSheet(`<h2>In the pool</h2><p class="fine">Tap a card to read it.</p>${(st.flowers || []).length ? `<h4>Flowers this round</h4><div class="pills">${st.flowers.map((f) => cchip(f)).join('')}</div>` : ''}<h4>Animals</h4><div class="pills">${(st.pool || []).map((x) => cchip(x)).join('')}</div>`, 'In the pool'); };
+    $('#ptable').onclick = () => { const r = P.data; if (!r || !r.state) return; openSheet(`<h2>The table</h2>${playTable(r)}<h4>What you did this round</h4>${didList(r.state)}`, 'The table'); drawLines(); setTimeout(drawLines, 400); };
     $('#feed').addEventListener('scroll', () => { if (atBottom($('#feed'))) { P.unseen = 0; $('#fnew').hidden = true; } }, { passive: true });
     $('#fnew').onclick = () => toBottom(true);
     $('#mhud').addEventListener('click', (e) => { if (e.target.closest('[data-me]')) openMe(); });
@@ -1134,9 +1183,16 @@
   }
 
   const eggOf = (c) => { const wild = c.id[0] === 'W'; return `<span class="egg ${wild ? 'wild' : 'HD'.includes(c.id[0]) ? 'red' : 'black'}">${wild ? 'W' : c.value}<i>${wild ? '' : SUIT[c.id[0]]}</i></span>`; };
+  // The table as you see it: your own animal, everyone's nest, who is thinking, and where you went at night.
+  function playTable(r) {
+    const s = r.state, me = s.me, asking = new Set(s.asking || []);
+    const people = Object.fromEntries(s.players.map((p) => [p.name, { nest: p.nest === null ? undefined : p.nest, dead: p.dead, ...(p.name === me.name && me.role ? { role: me.role, alignment: me.alignment } : {}) }]));
+    return table({ players: r.players }, s.round, people, { cls: 'mini', label: r.over ? 'Game over' : P.phase, arrows: s.arrows || [], sub: (n) => (asking.has(n) ? (n === me.name ? 'your turn' : 'thinking') : n === s.dealer ? 'dealer' : '') });
+  }
+  const didList = (s) => ((s.did || []).length ? `<ul class="plain did">${s.did.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="muted">Nothing yet this round.</p>');
   function drawHud(r) {
     const s = r.state; if (!s) return;
-    const key = JSON.stringify(s);
+    const key = JSON.stringify(s) + P.phase + r.over;
     if (key === P.hud) return;
     P.hud = key;
     const me = s.me, cards = {}; for (const c of me.hand) cards[c.id] = c;
@@ -1152,8 +1208,10 @@
           <span class="hud-me-text"><small>You are ${esc(me.name)}</small><b>${me.role ? 'The ' + esc(me.role) : 'Waiting for the deal'}</b><span class="pills">${sidePill(me.alignment)}${me.dead ? pill('Dead', 'muted') : ''}${me.winks ? pill(plural(me.winks, 'Wink'), 'yolk') : ''}</span></span></button>
         <div class="hud-nest"><span class="label">Your nest · ${me.hand.length}</span><div class="eggs">${me.hand.map(eggOf).join('') || '<span class="muted">Empty</span>'}</div></div>
         <div class="hud-bank">${ui('scores', 14)}<span><b>${me.banked + me.hand.length}</b> points so far</span><small>${me.banked} banked, ${me.hand.length} kept</small></div></section>
-      <section class="hud-table"><span class="label">The table</span><div class="hud-players">${s.players.map((p) => `<div class="hud-p${p.dead ? ' dead' : ''}${p.name === me.name ? ' me' : ''}"><span class="av tok">${eggToken(r.players.indexOf(p.name))}${asking.has(p.name) ? '<i class="think"></i>' : ''}</span><b>${p.name === me.name ? 'You' : esc(p.name)}</b><small>${p.dead ? 'dead' : p.nest === null ? 'hidden' : plural(p.nest, 'egg')}${p.name === s.dealer ? ' · dealer' : ''}</small></div>`).join('')}</div></section>
+      <section class="hud-table"><span class="label">The table</span>${playTable(r)}</section>
+      <section class="hud-did"><span class="label">What you did this round</span>${didList(s)}</section>
       <section class="hud-pool"><span class="label">In the pool</span><div class="hud-chips">${(s.flowers || []).map((f) => cchip(f)).join('')}${(s.pool || []).map((a) => cchip(a)).join('')}</div></section>`;
+    drawLines();
   }
   function openMe() {
     const s = (P.data || {}).state; if (!s) return;
@@ -1161,6 +1219,7 @@
     openSheet(`<header class="sheet-who"><span class="av xl ${sideClass(me.alignment)}">${me.role ? icon(me.role) : eggToken(0)}</span><div><h2>${me.role ? 'The ' + esc(me.role) : esc(me.name)}</h2><div class="pills">${sidePill(me.alignment)}${me.dead ? pill('Dead', 'muted') : ''}${me.winks ? pill(plural(me.winks, 'Wink'), 'yolk') : ''}</div></div></header>
       ${c ? `<p class="me-text">${esc(me.text || c.text)}</p>` : ''}
       <h4>Your nest · ${me.hand.length}</h4><div class="eggs roomy">${me.hand.map(eggOf).join('') || '<span class="muted">Empty</span>'}</div>
+      <h4>What you did this round</h4>${didList(s)}
       <h4>Your score</h4><p><b>${me.banked + me.hand.length}</b> points so far: ${me.banked} banked and ${me.hand.length} for cards kept.</p>
       <p class="fine">${me.alignment === 'Meowfia' ? 'You are Meowfia this round: get a Farm player eggsecuted.' : me.alignment === 'Farm' ? 'You are Farm this round: get a Meowfia player eggsecuted.' : ''}</p>`, 'You');
   }
