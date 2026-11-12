@@ -226,13 +226,22 @@
     if (typeof t === 'object') return t[v] || String(v);
     return t.replace('{}', m.kind === 'percent' ? Math.round(v * 100) : v);
   }
+  // Games you have not opened yet get a "New" mark. Kept in this browser; the first visit starts with only the
+  // latest game unread, so the list is not a wall of marks.
+  function seenGames() {
+    let seen = store.get('seen', null);
+    if (!Array.isArray(seen)) { seen = D.games.slice(1).map((g) => g.id); store.set('seen', seen); }
+    return seen;
+  }
+  const isNew = (g) => !seenGames().includes(g.id);
+  function markSeen(id) { const seen = seenGames(); if (!seen.includes(id)) { seen.push(id); store.set('seen', seen); } }
   const gamePool = (g) => (g.pool || [...new Set(g.rounds.flatMap((r) => r.revealed))]).filter((n) => D.card[n] && !D.card[n].buffer);
   // One game in the list: the cards that were in play first, then a short title and its tags.
   function gameCard(g) {
     const title = g.title || g.headline || `${g.players.length} players, ${plural(g.rounds.length, 'round')}`;
     const tags = gameTags(g);
     return `<article class="grow"><div class="grow-pool">${gamePool(g).map(cdot).join('')}</div>
-      <h2><a href="#/game/${encodeURIComponent(g.id)}"${g.headline && g.title ? ` title="${esc(g.headline)}"` : ''}>${esc(title)}</a></h2>
+      <h2><a href="#/game/${encodeURIComponent(g.id)}"${g.headline && g.title ? ` title="${esc(g.headline)}"` : ''}>${esc(title)}</a>${isNew(g) ? '<span class="newmark">New</span>' : ''}</h2>
       <div class="grow-tags">${tags.map((t) => `<button type="button" class="pill tag${tags.indexOf(t) >= tags.length - gameChanges(g).length ? ' yolk' : ''}${GL.tags.includes(t) ? ' on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div></article>`;
   }
   function viewGames() {
@@ -263,6 +272,7 @@
       if (!['all', 'table'].includes(G.view)) G.view = 'all';
     }
     G.tab = tab || 'overview';
+    markSeen(id);
     renderGame();
   }
   const spoil = (round) => G.view === 'all' || G.revealed.has(round) || G.revealed.has('all');
