@@ -611,14 +611,21 @@ body.playing main { padding: 0; min-height: 0; }
 .gday h3 { font: 600 11.5px var(--body); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 0; }
 .phase .lead { font-size: 17px; line-height: 1.5; max-width: 60ch; }
 .phase h4 { margin: 16px 0 8px; }
-.grow { position: relative; padding: 16px 18px; margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); display: grid; gap: 8px; }
+.grow { position: relative; padding: 14px 18px; margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); display: grid; gap: 8px; grid-template-areas: "pool" "title" "tags"; }
 .grow:hover { border-color: var(--line-2); }
-.grow-pool { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; }
-.grow-pool .cdot { width: 44px; height: 44px; }
-.grow h2 { font: 700 18px/1.25 var(--display); letter-spacing: -.01em; }
+.grow-pool { grid-area: pool; position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.grow-pool .cdot { width: 44px; height: 44px; pointer-events: auto; }
+.grow h2 { grid-area: title; font: 700 18px/1.25 var(--display); letter-spacing: -.01em; }
 .grow h2 a::after { content: ""; position: absolute; inset: 0; }
 .grow:hover h2 { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
-.grow-tags { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.grow-tags { grid-area: tags; position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.grow-tags .tag { pointer-events: auto; }
+@media (min-width: 700px) {
+  .grow { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title pool" "tags pool"; column-gap: 20px; align-items: center; }
+  .grow h2 { align-self: end; }
+  .grow-tags { align-self: start; }
+  .grow-pool { justify-content: flex-end; max-width: 520px; }
+}
 .pill.tag { cursor: pointer; white-space: normal; text-align: left; border: 1px solid transparent; }
 .pill.tag:hover { border-color: var(--line-2); }
 .pill.tag.on { background: var(--ink); color: var(--bg); }
