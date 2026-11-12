@@ -869,7 +869,7 @@
   const MODEL_NOTE = { haiku: 'Fast and light on usage. Misreads rules more often.', sonnet: 'Plays well. The usual choice.', opus: 'Sharper deduction. Heavy on usage.', fable: 'The strongest player. Heaviest on usage.' };
   const EFFORT_OPTS = [['', 'Default'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Very high'], ['max', 'Maximum']];
   const EFFORT = Object.fromEntries(EFFORT_OPTS);
-  const STYLE_OPTS = [['', 'None'], ['team', 'Team first'], ['balanced', 'Balanced'], ['selfish', 'Out for themselves']];
+  const STYLE_OPTS = [['', 'None'], ['team', 'Team first'], ['balanced', 'Balanced'], ['selfish', 'Out for themselves'], ['hoarder', 'Exploiter: hoards'], ['follower', 'Exploiter: follows']];
   const STYLE = Object.fromEntries(STYLE_OPTS);
   const blank = () => ({ kind: 'game', variant: '', players: null, rounds: null, seed: '', games: 500, model: 'sonnet', effort: '', review: 'opus', probes: true, human: '', opponents: 'claude', seats: {}, seatRounds: 'all', roles: null, flowers: null, startPool: [], reveals: [], rules: {}, raw: '' });
   let B = Object.assign(blank(), store.get('builder', {}));
